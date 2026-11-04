@@ -1,0 +1,6 @@
+# backups e planilhas exportadas pelo app têm dados pessoais: nunca versionar
+plin-backup*.json
+plin-*.csv
+*.csv
+.DS_Store
+node_modules/
