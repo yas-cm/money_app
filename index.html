@@ -411,7 +411,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '1.3';
+  const VERSAO = '1.4';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -1573,7 +1573,12 @@ button { cursor: pointer; }
   render();
   store.init();
   // app instalável e funcionando sem internet (só quando servido por http/https)
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    // quando uma versão nova do app assume, recarrega uma vez para mostrar ela
+    const tinha = !!navigator.serviceWorker.controller; let recarregou = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (tinha && !recarregou) { recarregou = true; location.reload(); } });
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {});
+  }
 })();
 </script>
 </body>
