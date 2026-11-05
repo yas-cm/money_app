@@ -2,7 +2,7 @@
 
 Caderneta de bolso para o dinheiro do mês: anotar gastos e entradas, guardar em caixinhas, dividir a renda em potes e ver gráficos. Feito para o celular, funciona no navegador e pode ser instalado como app (PWA).
 
-**Os dados ficam só no seu aparelho**, no armazenamento do navegador (IndexedDB). Não há login nem servidor. Para levar os dados para outro aparelho ou guardar uma cópia, use **Números → Salvar backup** e depois **Importar backup**.
+**Os dados ficam só no seu aparelho**, no armazenamento do navegador (IndexedDB). Não há login nem servidor. Para levar os dados para outro aparelho ou guardar uma cópia, use **Config → Salvar backup** e depois **Importar backup**.
 
 ## O que tem
 
@@ -11,7 +11,7 @@ Caderneta de bolso para o dinheiro do mês: anotar gastos e entradas, guardar em
 - **Caixinhas**: saldo, meta, banco, rendimento e resgate; meta que soma o saldo de outras caixinhas.
 - **Plano**: divisão da renda prevista em potes (Livre, Investimentos, Viagens, 13º), aportes fixos, gastos fixos (assinaturas), lembretes e gastos planejados.
 - **Gráficos**: gasto por categoria, mês a mês e maiores gastos do período.
-- **Números**: categorias (com cor, teto e arquivar), planilha .csv para o Excel e backup .json.
+- **Config**: categorias (com cor, teto e arquivar), planilha .csv para o Excel e backup .json.
 
 ## Rodar localmente
 
