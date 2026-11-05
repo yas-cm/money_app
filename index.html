@@ -46,6 +46,12 @@ button { cursor: pointer; }
 .mark svg { width: 30px; height: 30px; }
 .mark small { font-family: var(--body); font-size: .62rem; font-weight: 600; color: var(--muted); letter-spacing: 0; }
 .status { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.top-r { display: flex; align-items: center; gap: 10px; }
+.olho { border: 1px solid var(--line); background: var(--panel); color: var(--muted); border-radius: 50%; width: 38px; height: 38px; display: grid; place-items: center; padding: 0; }
+.olho svg { width: 20px; height: 20px; }
+.olho .risco { display: none; }
+.olho[aria-pressed="true"] { color: var(--tang); border-color: var(--tang); }
+.olho[aria-pressed="true"] .risco { display: inline; }
 .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .status.ok i { background: var(--mint); } .status.warn i { background: var(--tang); } .status.bad i { background: var(--bad); }
 .months { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 4px; }
@@ -222,9 +228,14 @@ button { cursor: pointer; }
   <header class="top">
     <div class="mark">
       <svg viewBox="0 0 30 30" aria-hidden="true"><rect x="2" y="7" width="26" height="20" rx="7" fill="var(--ink)"/><rect x="10" y="12" width="10" height="3" rx="1.5" fill="var(--bg)"/><circle cx="15" cy="5" r="4" fill="var(--tang)"/></svg>
-      plin <small id="versao">1.0</small>
+      plin <small id="versao">1.1</small>
     </div>
-    <span class="status" id="status"><i></i><span>carregando</span></span>
+    <div class="top-r">
+      <span class="status" id="status"><i></i><span>carregando</span></span>
+      <button type="button" class="olho" id="olho" aria-pressed="false" aria-label="Ocultar valores" title="Ocultar valores">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="risco" d="M3 3l18 18"/></svg>
+      </button>
+    </div>
   </header>
 
   <div class="notice" id="notice" hidden></div>
@@ -394,7 +405,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '1.0';
+  const VERSAO = '1.1';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -403,7 +414,12 @@ button { cursor: pointer; }
 
   // ---------- formatos (valores sempre em centavos) ----------
   const brlF = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-  const brl = (c) => brlF.format((Number(c) || 0) / 100);
+  // Modo "ocultar valores" (o olhinho no topo): troca todo valor em R$ por pontinhos. A escolha fica salva no aparelho.
+  let oculto = false;
+  try { oculto = localStorage.getItem('plin-ocultar') === '1'; } catch (e) { /* ok */ }
+  const MASCARA = 'R$ •••••';
+  const brlReal = (c) => brlF.format((Number(c) || 0) / 100);
+  const brl = (c) => oculto ? MASCARA : brlReal(c);
   const n2 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const monthF = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   const monShort = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' });
@@ -598,6 +614,17 @@ button { cursor: pointer; }
   let catTab = 'gasto';
 
   // ---------- telas ----------
+  function pintarOlho() {
+    const b = $('olho'); const t = oculto ? 'Mostrar valores' : 'Ocultar valores';
+    b.setAttribute('aria-pressed', String(oculto)); b.setAttribute('aria-label', t); b.title = t;
+  }
+  $('olho').addEventListener('click', () => {
+    oculto = !oculto;
+    try { localStorage.setItem('plin-ocultar', oculto ? '1' : '0'); } catch (e) { /* ok */ }
+    pintarOlho(); render();
+  });
+  pintarOlho();
+
   function render() {
     status(); notice();
     renderMonths(); renderMes(); renderCaixinhas(); renderPlano(); renderGraficos(); renderNumeros();
@@ -642,7 +669,7 @@ button { cursor: pointer; }
       const porDia = Math.floor(livreDepois / dias);
       hojeEl.hidden = false;
       hojeEl.replaceChildren(
-        h('div', null, h('span', { class: 'label' }, 'Pode gastar por dia'), h('b', { class: 'big2 num' + (porDia < 0 ? ' neg' : '') }, porDia > 0 ? brl(porDia) : 'R$ 0'), h('small', null, `até dia ${ultimo}` + (o.pendente ? `, já guardando ${brl(o.pendente)} pros planejados e fixos` : ''))),
+        h('div', null, h('span', { class: 'label' }, 'Pode gastar por dia'), h('b', { class: 'big2 num' + (porDia < 0 ? ' neg' : '') }, porDia > 0 ? brl(porDia) : (oculto ? MASCARA : 'R$ 0')), h('small', null, `até dia ${ultimo}` + (o.pendente ? `, já guardando ${brl(o.pendente)} pros planejados e fixos` : ''))),
         h('div', null, h('span', { class: 'label' }, 'Hoje'), h('b', { class: 'big2 num' + (porDia > 0 && gHoje > porDia ? ' neg' : '') }, brl(gHoje)), h('small', null, gHoje === 0 ? 'nada ainda' : porDia > 0 && gHoje > porDia ? `passou ${brl(gHoje - porDia)}` : `sobra ${brl(Math.max(0, porDia - gHoje))}`)));
     } else hojeEl.hidden = true;
     renderMesResto(d);
@@ -1169,14 +1196,14 @@ button { cursor: pointer; }
       const c = parseCent(cotIn.value);
       return Math.round(v * c / 100);
     }
-    function paintConv() { convEl.hidden = moeda === 'brl'; if (moeda !== 'brl') convEl.textContent = '= ' + brl(emReais() || 0); paintParc(); }
+    function paintConv() { convEl.hidden = moeda === 'brl'; if (moeda !== 'brl') convEl.textContent = '= ' + brlReal(emReais() || 0); paintParc(); }
     cotIn.addEventListener('input', paintConv);
     const data = h('input', { type: 'date', id: 'l-data', value: st.data });
     const kinds = h('div', { class: 'kinds' });
     const parcInfo = h('p', { class: 'sub', style: 'margin-top:-6px' });
     function paintParc() {
       const n = st.parcelas || 1; parcInfo.hidden = n <= 1;
-      if (n > 1) { const v = emReais() || 0; parcInfo.textContent = `Valor total. Vira ${n}x de ${brl(Math.floor(v / n))}, uma por mês a partir da data.`; }
+      if (n > 1) { const v = emReais() || 0; parcInfo.textContent = `Valor total. Vira ${n}x de ${brlReal(Math.floor(v / n))}, uma por mês a partir da data.`; }
     }
     const cats = h('div', { class: 'chips' });
     const extra = h('div', { class: 'stack', style: 'gap:12px' });
