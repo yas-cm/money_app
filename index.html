@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Plin</title>
 <meta name="description" content="Plin: controle de gastos, caixinhas e plano do mês. Os dados ficam só no seu aparelho.">
-<meta name="theme-color" content="#f3f4f8" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0e1220" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f3ff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151027" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -14,20 +14,20 @@
 <style>
 /* Layout: caderneta de bolso. Marca + faixa de meses no topo, abas em texto, o pote do Livre como destaque do mês, extrato por dia e um botão "Anotar" fixo embaixo. */
 :root {
-  --bg: #f3f4f8; --panel: #ffffff; --ink: #141b2e; --muted: #5d6478; --line: #e1e4ec; --field: #f0f2f7;
-  --tang: #f2662e; --tang-ink: #ffffff; --tang-soft: #ffe7dc; --mint: #17a387; --mint-soft: #d9f3ec; --navy: #26324f; --bad: #d23c2f;
+  --bg: #f6f3ff; --panel: #ffffff; --ink: #241a4a; --muted: #6d6690; --line: #e6e0f7; --field: #f1edfc;
+  --tang: #7c5cff; --tang-ink: #ffffff; --tang-soft: #ece6ff; --mint: #f0a21c; --mint-soft: #fff1cc; --navy: #3b2c7a; --bad: #d23c5a;
   --display: "Unbounded", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --body: "Figtree", "Segoe UI", system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0e1220; --panel: #161b2c; --ink: #e9ecf5; --muted: #98a0b6; --line: #262d42; --field: #1d2336;
-    --tang: #ff7f4d; --tang-ink: #1a0b03; --tang-soft: #3d2116; --mint: #3dd3b0; --mint-soft: #123a33; --navy: #c5cde3; --bad: #ff8a7a; color-scheme: dark;
+    --bg: #151027; --panel: #1e1836; --ink: #ece8ff; --muted: #a59fc4; --line: #2e2650; --field: #251e40;
+    --tang: #a993ff; --tang-ink: #1a1033; --tang-soft: #2f2557; --mint: #ffd84d; --mint-soft: #3a3014; --navy: #d3c9ff; --bad: #ff8aa0; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0e1220; --panel: #161b2c; --ink: #e9ecf5; --muted: #98a0b6; --line: #262d42; --field: #1d2336;
-  --tang: #ff7f4d; --tang-ink: #1a0b03; --tang-soft: #3d2116; --mint: #3dd3b0; --mint-soft: #123a33; --navy: #c5cde3; --bad: #ff8a7a; color-scheme: dark;
+  --bg: #151027; --panel: #1e1836; --ink: #ece8ff; --muted: #a59fc4; --line: #2e2650; --field: #251e40;
+  --tang: #a993ff; --tang-ink: #1a1033; --tang-soft: #2f2557; --mint: #ffd84d; --mint-soft: #3a3014; --navy: #d3c9ff; --bad: #ff8aa0; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -227,7 +227,7 @@ button { cursor: pointer; }
 <div class="app">
   <header class="top">
     <div class="mark">
-      <svg viewBox="0 0 30 30" aria-hidden="true"><rect x="2" y="7" width="26" height="20" rx="7" fill="var(--ink)"/><rect x="10" y="12" width="10" height="3" rx="1.5" fill="var(--bg)"/><circle cx="15" cy="5" r="4" fill="var(--tang)"/></svg>
+      <img src="icon.svg" alt="" width="34" height="34" style="border-radius:9px">
       plin <small id="versao">1.1</small>
     </div>
     <div class="top-r">
@@ -405,7 +405,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '1.1';
+  const VERSAO = '1.2';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
