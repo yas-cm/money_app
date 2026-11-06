@@ -411,7 +411,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '1.5';
+  const VERSAO = '1.6';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -1282,6 +1282,7 @@ button { cursor: pointer; }
       if (st.tipo === 'gasto' || st.tipo === 'entrada') { rec.cat = st.cat || ''; if (st.tipo === 'gasto' && st.origem) rec.origem = st.origem; }
       else { if (!st.caixinha) { toast('Crie uma caixinha primeiro.'); return; } rec.caixinha = st.caixinha; }
       if (st.rec) rec.rec = st.rec;
+      if (st.pj) rec.pj = st.pj;
       if (l && l.parc) rec.parc = l.parc;
       sh.close();
       const n = !edit && st.tipo === 'gasto' ? (st.parcelas || 1) : 1;
@@ -1355,20 +1356,38 @@ button { cursor: pointer; }
     const valor = moneyInput(p && p.valor); valor.id = 'pj-valor';
     const mesIn = h('input', { type: 'month', id: 'pj-mes', value: p ? p.mes || '' : mes });
     const feito = h('input', { type: 'checkbox', id: 'pj-feito' }); feito.checked = !!(p && p.feito);
+    const ligados = p ? all().filter((l) => l.pj === p.id) : [];
     const fontes = ['Livre', '13º', ...cfg.caixinhas.map((c) => c.nome)];
     const sai = h('select', { id: 'pj-sai' }, h('option', { value: '' }, 'Não definido'), [...new Set(fontes)].map((f) => h('option', { value: f }, f))); sai.value = (p && p.sai) || '';
     const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, p ? 'Salvar' : 'Adicionar');
     const body = h('div', { class: 'stack', style: 'gap:12px' }, field('O que é', desc), h('div', { class: 'two' }, field('Valor', valor), field('Mês (opcional)', mesIn)), field('Sai de', sai),
       h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:600' }, feito, 'Já paguei'),
       h('div', { class: 'row-btns' }, save, p ? dangerBtn('Excluir', async () => { cfg.planejados = cfg.planejados.filter((x) => x.id !== p.id); sh.close(); render(); await salvarCfg(); toast('Excluído.'); }) : null));
+    // pago sem gasto anotado (marcado antes desta versão): oferece anotar agora
+    if (p && p.feito && !ligados.length) body.append(h('p', { class: 'sub' }, 'Marcado como pago, mas o gasto não foi anotado, então não saiu do mês. ', h('button', { class: 'btn alt', type: 'button', style: 'margin-top:6px', onclick: () => { sh.close(); anotarPlanejado(p); } }, 'Anotar o gasto agora')));
     const sh = sheet(p ? 'Gasto planejado' : 'Novo gasto planejado', body);
     save.addEventListener('click', async () => {
       const v = parseCent(valor.value);
       if (!desc.value.trim() || !(v > 0)) { toast('Preencha o que é e o valor.'); return; }
       const rec = { id: p ? p.id : uid(), desc: desc.value.trim(), valor: v, mes: mesIn.value || '', feito: feito.checked, sai: sai.value };
       cfg.planejados = p ? cfg.planejados.map((x) => (x.id === p.id ? rec : x)) : [...cfg.planejados, rec];
-      sh.close(); render(); await salvarCfg(); toast('Salvo.');
+      sh.close(); render(); await salvarCfg();
+      if (rec.feito && !(p && p.feito) && !ligados.length) { anotarPlanejado(rec); return; }
+      if (!rec.feito && ligados.length) {
+        for (const l of ligados) await tirarLanc(l);
+        toast('Desmarcado. O gasto anotado foi tirado do mês.', { label: 'Desfazer', fn: async () => { for (const l of ligados) await porLanc(l); cfg.planejados = cfg.planejados.map((x) => (x.id === rec.id ? { ...rec, feito: true } : x)); render(); await salvarCfg(); } });
+        return;
+      }
+      toast('Salvo.');
     });
+  }
+  // marcar planejado como pago abre o Anotar já preenchido; o gasto fica ligado pelo campo pj
+  function anotarPlanejado(p) {
+    const cx = p.sai && p.sai !== 'Livre' ? cfg.caixinhas.find((c) => c.nome === p.sai) : null;
+    const hoje = todayISO();
+    const data = p.mes && p.mes < ymOf(hoje) ? p.mes + '-' + String(new Date(Date.UTC(+p.mes.slice(0, 4), +p.mes.slice(5, 7), 0)).getUTCDate()).padStart(2, '0') : hoje;
+    openLanc({ tipo: 'gasto', valor: p.valor, desc: p.desc, data, origem: cx ? cx.id : '', pj: p.id, novo: true });
+    toast(cx ? `Anote o gasto: ele sai da caixinha ${cx.nome}.` : 'Anote o gasto pra ele sair do mês.');
   }
 
   function openRec(r) {
@@ -1498,7 +1517,7 @@ button { cursor: pointer; }
     c.categorias.gasto = ((b.categorias || {}).despesa || []).map((x, i) => ({ id: x.id, nome: x.nome, cor: cor(x, i, 0) }));
     c.categorias.entrada = ((b.categorias || {}).receita || []).map((x, i) => ({ id: x.id, nome: x.nome, cor: cor(x, i, 3) }));
     c.caixinhas = (b.caixinhas || []).map((x) => ({ id: x.id, nome: x.nome, banco: x.banco || '', grupo: GRUPOS[x.grupo] ? x.grupo : 'outros', meta: x.meta ? cents(x.meta) : null, rende: x.rende || '', resgate: x.resgate || '', nota: x.nota || '', saldoBase: cents(x.saldo), baseEm: x.baseEm || 0 }));
-    c.planejados = (b.planejados || []).map((x) => ({ id: x.id, desc: x.desc, valor: cents(x.valor), mes: x.mes || '', feito: !!x.feito }));
+    c.planejados = (b.planejados || []).map((x) => ({ id: x.id, desc: x.desc, valor: cents(x.valor), mes: x.mes || '', feito: !!x.feito, sai: x.sai || '' }));
     const m = {};
     for (const l of b.lancamentos) {
       const r = { id: l.id, tipo: T[l.tipo] || l.tipo, valor: cents(l.valor), desc: l.desc || '', data: l.data, criadoEm: l.criadoEm || 0, atualizadoEm: Date.now() };
