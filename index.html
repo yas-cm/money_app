@@ -411,7 +411,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '1.6';
+  const VERSAO = '1.7';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -667,8 +667,10 @@ button { cursor: pointer; }
     if (!carregou) return;
     const d = doMes(mes);
     const o = orcamento(mes, d);
-    $('livre-label').textContent = 'Ainda livre no mês';
     const meta = o.meta;
+    const futuro = mes > ymOf(todayISO());
+    // sem dinheiro do mês ainda não dá pra falar em Livre: mostra só o que foi gasto, com o rótulo certo
+    $('livre-label').textContent = meta > 0 ? (futuro ? 'Livre previsto no mês' : 'Ainda livre no mês') : 'Gastou no mês';
     const resta = meta - d.gastou;
     const frac = meta > 0 ? Math.max(0, Math.min(1, resta / meta)) : 0;
     const fill = $('jar-fill'); const H = 106;
@@ -680,7 +682,7 @@ button { cursor: pointer; }
       big.textContent = resta >= 0 ? brl(resta) : '− ' + brl(-resta);
       big.className = 'big num' + (resta < 0 ? ' neg' : '');
       $('livre-de').textContent = resta >= 0 ? `de ${brl(meta)} ${o.como}` : `passou ${brl(-resta)} do Livre de ${brl(meta)}`;
-    } else { big.textContent = brl(d.gastou); big.className = 'big num'; $('livre-de').textContent = 'gastos do mês. Ainda não entrou dinheiro neste mês.'; }
+    } else { big.textContent = brl(d.gastou); big.className = 'big num'; $('livre-de').textContent = d.gastou ? 'Ainda não entrou dinheiro neste mês. Quando você anotar uma entrada, aqui passa a mostrar quanto ainda está livre.' : (futuro ? 'Nada anotado ainda. Quando entrar dinheiro, aqui mostra quanto fica livre.' : 'Nada anotado ainda neste mês.'); }
     // hoje e quanto dá por dia (só no mês atual)
     const hojeEl = $('hoje'); const hoje = todayISO();
     if (mes === ymOf(hoje) && meta > 0) {
