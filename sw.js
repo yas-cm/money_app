@@ -1,7 +1,7 @@
 // Plin: guarda o app no aparelho para abrir sem internet.
 // Mude VERSAO quando publicar uma versão nova, para o navegador trocar o cache.
-const VERSAO = 'plin-1.4';
-const APP = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
+const VERSAO = 'plin-1.5';
+const APP = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-v2-192.png', 'icon-v2-512.png', 'icon-v2-maskable-512.png'];
 
 self.addEventListener('install', (e) => {
   // cache: 'reload' pula o cache do navegador (o GitHub Pages guarda os arquivos por 10 min), senão a versão nova podia nascer com arquivos velhos
