@@ -411,7 +411,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '1.7';
+  const VERSAO = '1.8';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
