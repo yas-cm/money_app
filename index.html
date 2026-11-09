@@ -411,7 +411,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '1.8';
+  const VERSAO = '1.9';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -578,10 +578,14 @@ button { cursor: pointer; }
   const catsOf = (t) => cfg.categorias[t === 'entrada' ? 'entrada' : 'gasto'] || [];
   const catById = (t, id) => catsOf(t).find((c) => c.id === id) || { nome: 'Sem categoria', cor: '#9aa0b0' };
   const cxById = (id) => cfg.caixinhas.find((c) => c.id === id);
+  // lançamentos que mexem no saldo da caixinha: guardar, resgatar e gasto que saiu dela
+  const mexeCx = (l, id) => l.caixinha === id || (l.tipo === 'gasto' && l.origem === id);
+  // entra no saldo o que foi anotado depois do último saldo informado e cuja data já chegou
+  const contaNoSaldo = (l, cx) => mexeCx(l, cx.id) && (l.criadoEm || 0) > (cx.baseEm || 0) && l.data <= todayISO();
   function saldoCx(cx) {
     let v = cx.saldoBase || 0;
     for (const l of all()) {
-      if ((l.criadoEm || 0) <= (cx.baseEm || 0)) continue;
+      if (!contaNoSaldo(l, cx)) continue;
       if (l.tipo === 'guardar' && l.caixinha === cx.id) v += l.valor;
       else if (l.tipo === 'resgatar' && l.caixinha === cx.id) v -= l.valor;
       else if (l.tipo === 'gasto' && l.origem === cx.id) v -= l.valor;
@@ -1172,6 +1176,12 @@ button { cursor: pointer; }
     toast(`Plin! ${base.desc} ${brl(base.valor)}.` + avisoTeto(rec), { label: 'Desfazer', fn: () => tirarLanc(rec) });
   }
 
+  // no toast: avisa que o saldo da caixinha mudou sozinho
+  function avisoCx(rec, antigo) {
+    const ids = new Set([rec.tipo === 'gasto' ? rec.origem : rec.caixinha, antigo && (antigo.tipo === 'gasto' ? antigo.origem : antigo.caixinha)].filter(Boolean));
+    const txt = [...ids].map(cxById).filter(Boolean).map((cx) => `${cx.nome} ficou com ${brl(saldoCx(cx))}`);
+    return txt.length ? ' ' + txt.join(', ') + '.' : '';
+  }
   function openLanc(l) {
     if (bloqueado()) return;
     const edit = !!l && !l.novo;
@@ -1183,7 +1193,7 @@ button { cursor: pointer; }
       if (k === 'del') amt = amt.slice(0, -1);
       else if (k === ',') { if (!amt.includes(',')) amt = (amt || '0') + ','; }
       else { const dec = amt.split(',')[1]; if (dec != null && dec.length >= 2) return; if (amt.replace(',', '').length >= 9) return; amt = amt === '0' ? k : amt + k; }
-      paintAmt(); if (typeof paintConv === 'function' && convEl) paintConv();
+      paintAmt(); if (typeof paintConv === 'function' && convEl) paintConv(); if (typeof paintOrigem === 'function') paintOrigem();
     };
     const pad = h('div', { class: 'pad' }, ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'del'].map((k) => h('button', { type: 'button', 'aria-label': k === 'del' ? 'Apagar' : k, onclick: () => press(k) }, k === 'del' ? '⌫' : k)));
     paintAmt();
@@ -1223,6 +1233,7 @@ button { cursor: pointer; }
     function paintConv() { convEl.hidden = moeda === 'brl'; if (moeda !== 'brl') convEl.textContent = '= ' + brlReal(emReais() || 0); paintParc(); }
     cotIn.addEventListener('input', paintConv);
     const data = h('input', { type: 'date', id: 'l-data', value: st.data });
+    data.addEventListener('change', () => paintOrigem());
     const kinds = h('div', { class: 'kinds' });
     const parcInfo = h('p', { class: 'sub', style: 'margin-top:-6px' });
     function paintParc() {
@@ -1231,6 +1242,17 @@ button { cursor: pointer; }
     }
     const cats = h('div', { class: 'chips' });
     const extra = h('div', { class: 'stack', style: 'gap:12px' });
+    const origemBox = h('div', { class: 'stack', style: 'gap:4px' });
+    const origemInfo = h('p', { class: 'sub', id: 'l-origem-info' });
+    // mostra quanto a caixinha fica depois do gasto (desconta sozinho, sem precisar mexer na aba Caixinhas)
+    function paintOrigem() {
+      const cx = st.tipo === 'gasto' && st.origem ? cxById(st.origem) : null;
+      origemInfo.hidden = !cx; if (!cx) return;
+      const v = emReais() || 0;
+      const antes = saldoCx(cx) + (edit && l.origem === cx.id && contaNoSaldo(l, cx) ? l.valor : 0);
+      const futuro = data.value > todayISO();
+      origemInfo.textContent = futuro ? `Desconta da caixinha ${cx.nome} no dia ${data.value.split('-').reverse().join('/')}.` : `Desconta da caixinha ${cx.nome}: fica com ${brl(antes - v)}.`;
+    }
     function paint() {
       kinds.replaceChildren(...TIPOS.map(([k, t]) => h('button', { type: 'button', 'aria-pressed': String(st.tipo === k), onclick: () => { st.tipo = k; if ((k === 'gasto' || k === 'entrada') && !catsOf(k).find((c) => c.id === st.cat)) st.cat = (catsOf(k)[0] || {}).id; paint(); } }, t)));
       cats.replaceChildren(); extra.replaceChildren();
@@ -1238,14 +1260,18 @@ button { cursor: pointer; }
         cats.hidden = false;
         cats.append(...catsPorUso(st.tipo, uso, st.cat).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(st.cat === c.id), onclick: () => { st.cat = c.id; catManual = true; paint(); } }, h('i', { style: `background:${c.cor}` }), c.nome)));
         if (st.tipo === 'gasto') {
-          const sel = h('select', { id: 'l-origem', onchange: (e) => { st.origem = e.target.value; } }, h('option', { value: '' }, 'Dinheiro do mês (Livre)'), cfg.caixinhas.map((c) => h('option', { value: c.id }, 'Caixinha ' + c.nome)));
-          sel.value = st.origem || ''; extra.append(field('Saiu de', sel));
           if (!edit) {
             const ps = h('select', { id: 'l-parc', onchange: (e) => { st.parcelas = Number(e.target.value); paintParc(); } }, Array.from({ length: 12 }, (_, i) => h('option', { value: i + 1 }, i === 0 ? 'À vista' : `${i + 1}x`)));
             ps.value = String(st.parcelas || 1); extra.append(field('Parcelas', ps), parcInfo);
           }
         }
-      } else {
+      }
+      if (st.tipo === 'gasto' && cfg.caixinhas.length) {
+        const sel = h('select', { id: 'l-origem', onchange: (e) => { st.origem = e.target.value; paintOrigem(); } }, h('option', { value: '' }, 'Dinheiro do mês (Livre)'), cfg.caixinhas.map((c) => h('option', { value: c.id }, 'Caixinha ' + c.nome)));
+        sel.value = st.origem || '';
+        origemBox.replaceChildren(field('Saiu de', sel), origemInfo); origemBox.hidden = false; paintOrigem();
+      } else { origemBox.replaceChildren(); origemBox.hidden = true; }
+      if (st.tipo !== 'gasto' && st.tipo !== 'entrada') {
         cats.hidden = true;
         const sel = h('select', { id: 'l-cx', onchange: (e) => { st.caixinha = e.target.value; } }, cfg.caixinhas.map((c) => h('option', { value: c.id }, c.nome)));
         sel.value = st.caixinha || (cfg.caixinhas[0] || {}).id || ''; st.caixinha = sel.value;
@@ -1256,8 +1282,8 @@ button { cursor: pointer; }
     paint();
     const save = h('button', { class: 'btn hot', type: 'button', style: 'flex:1' }, edit ? 'Salvar' : 'Anotar');
     const quick = !l && uso.atalhos.length ? h('div', { class: 'field' }, h('span', null, 'Atalhos (um toque anota hoje)'), h('div', { class: 'quick' }, uso.atalhos.map((a) => h('button', { type: 'button', onclick: () => { sh.close(); anotarAtalho(a); } }, h('b', null, a.desc), h('small', null, brl(a.valor) + ' · ' + catById('gasto', a.cat).nome))))) : null;
-    const body = h('div', { class: 'stack', style: 'gap:12px' }, quick, kinds, h('div', { class: 'amount' }, curEl, amtEl, edit ? null : curSel), convEl, cotField, pad, field('Descrição', desc), dl, cats, extra, field('Data', data),
-      h('div', { class: 'row-btns' }, save, edit ? h('button', { class: 'btn danger', type: 'button', onclick: async () => { sh.close(); await tirarLanc(l); toast('Excluído.', { label: 'Desfazer', fn: () => porLanc(l) }); } }, l.parc ? 'Excluir só esta' : 'Excluir') : null,
+    const body = h('div', { class: 'stack', style: 'gap:12px' }, quick, kinds, h('div', { class: 'amount' }, curEl, amtEl, edit ? null : curSel), convEl, cotField, pad, origemBox, field('Descrição', desc), dl, cats, extra, field('Data', data),
+      h('div', { class: 'row-btns' }, save, edit ? h('button', { class: 'btn danger', type: 'button', onclick: async () => { sh.close(); await tirarLanc(l); toast('Excluído.' + avisoCx(l), { label: 'Desfazer', fn: () => porLanc(l) }); } }, l.parc ? 'Excluir só esta' : 'Excluir') : null,
         edit && l.parc ? dangerBtn(`Excluir as ${l.parc.n} parcelas`, async () => { sh.close(); await tirarParcelas(l.parc.id); toast('Parcelas excluídas.'); }) : null),
       edit && l.parc ? h('p', { class: 'sub' }, `Parcela de uma compra de ${brl(l.parc.total)} em ${l.parc.n}x. Mudar aqui muda só esta parcela.`) : null);
     const sh = sheet(edit ? 'Editar' : 'Anotar', body);
@@ -1300,13 +1326,13 @@ button { cursor: pointer; }
         for (const r of recs) (meses[ymOf(r.data)] = meses[ymOf(r.data)] || []).push(r);
         mes = ymOf(rec.data); render();
         for (const ym of new Set(recs.map((r) => ymOf(r.data)))) await salvarMes(ym);
-        toast(`Plin! ${n}x de ${brl(base)} anotadas.` + avisoTeto(recs[0]), { label: 'Desfazer', fn: () => tirarParcelas(pid) });
+        toast(`Plin! ${n}x de ${brl(base)} anotadas.` + avisoCx(recs[0]) + avisoTeto(recs[0]), { label: 'Desfazer', fn: () => tirarParcelas(pid) });
         return;
       }
       if (edit && ymOf(l.data) !== ymOf(rec.data)) await tirarLanc(l);
       mes = ymOf(rec.data);
       await porLanc(rec);
-      toast((edit ? 'Salvo.' : 'Plin! Anotado.') + avisoTeto(rec));
+      toast((edit ? 'Salvo.' : 'Plin! Anotado.') + avisoCx(rec, edit ? l : null) + avisoTeto(rec));
     }
     save.addEventListener('click', go);
   }
@@ -1329,9 +1355,19 @@ button { cursor: pointer; }
     const nota = h('input', { type: 'text', id: 'cx-nota', value: cx ? cx.nota || '' : '', placeholder: 'Para que serve' });
     const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, cx ? 'Salvar' : 'Criar caixinha');
     const usada = cx && all().some((l) => l.caixinha === cx.id || l.origem === cx.id);
+    // o que mexeu no saldo desde o último saldo informado (gastos que saíram dela descontam sozinhos)
+    const movs = cx ? all().filter((l) => contaNoSaldo(l, cx)).sort((a, b) => b.data.localeCompare(a.data) || (b.criadoEm || 0) - (a.criadoEm || 0)) : [];
+    const movRow = (l) => {
+      const sai = l.tipo !== 'guardar';
+      const nm = l.desc || (l.tipo === 'gasto' ? catById('gasto', l.cat).nome : l.tipo === 'guardar' ? 'Guardou' : 'Resgatou');
+      return h('button', { class: 'en', type: 'button', onclick: () => { sh.close(); openLanc(l); } }, h('span', { class: 't' }, nm), h('span', { class: 'v' + (sai ? '' : ' pos') }, (sai ? '− ' : '+ ') + brl(l.valor)), h('span', { class: 'meta' }, l.data.split('-').reverse().slice(0, 2).join('/') + ' · ' + (l.tipo === 'gasto' ? 'gasto' : l.tipo)));
+    };
+    const movBox = movs.length ? h('div', { class: 'field' }, h('span', null, 'Mexeu no saldo desde a última atualização'), h('div', null, movs.slice(0, 8).map(movRow)), movs.length > 8 ? h('p', { class: 'sub' }, `e mais ${movs.length - 8}.`) : null) : null;
     const body = h('div', { class: 'stack', style: 'gap:12px' },
       field('Nome', nome), h('div', { class: 'two' }, field('Banco', banco), field('Grupo', grupo)),
       field(cx ? 'Saldo de hoje (atualize com o rendimento do banco)' : 'Saldo de hoje', saldo),
+      cx ? h('p', { class: 'sub', style: 'margin-top:-6px' }, 'Gastos que saem desta caixinha, guardar e resgatar já mudam o saldo sozinhos. Só mexa aqui para acertar com o banco (rendimento).') : null,
+      movBox,
       h('div', { class: 'two' }, field('Meta', meta), field('Rende', rende)),
       h('div', { class: 'field' }, h('span', null, 'Somar na meta o saldo de (opcional)'), somaBox),
       field('Resgate', resgate), field('Para que serve', nota),
