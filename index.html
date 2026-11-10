@@ -313,6 +313,7 @@ button { cursor: pointer; }
       <p class="sub" id="pl-base">—</p>
       <div id="pl-rows"></div>
       <p class="sub" id="pl-nota"></p>
+      <div class="row-btns" id="pl-acoes"></div>
     </div>
     <div class="panel">
       <h2>Aportes fixos</h2>
@@ -411,7 +412,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '1.8';
+  const VERSAO = '1.10';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -602,8 +603,9 @@ button { cursor: pointer; }
     return { ls, entrou, gastou, gastoCx, guardou, porGrupo };
   }
 
-  // plano do mês: 'fixo' (divisão % da renda prevista) ou null
+  // plano do mês: 'mes' (plano feito só para aquele mês), 'fixo' (divisão % da renda prevista) ou null
   function planoDe(ym) {
+    if (cfg.planosMes && cfg.planosMes[ym]) return 'mes';
     if (cfg.rendaPrevista && ym >= (cfg.divisaoDesde || '0000-00')) return 'fixo';
     return null;
   }
@@ -704,7 +706,16 @@ button { cursor: pointer; }
     const pendente = cfg.planejados.filter((p) => !p.feito && p.mes === ym && (!p.sai || p.sai === 'Livre')).reduce((a, p) => a + p.valor, 0)
       + recorrentesDe(ym).filter((r) => !r.feito).reduce((a, r) => a + r.valor, 0);
     if (pl === 'fixo') return { meta: Math.round(cfg.rendaPrevista * (cfg.divisao.livre || 0) / 100), pendente, como: `(${cfg.divisao.livre}% da renda prevista)` };
+    if (pl === 'mes') return { meta: livreDoPlano(ym, d), pendente, como: '(do plano do mês)' };
     return { meta: Math.max(0, d.entrou - d.guardou), pendente, como: '(o que entrou menos o que foi guardado)' };
+  }
+  // plano feito só para um mês: renda prevista menos os aportes (o que já foi guardado além do plano também sai do Livre)
+  function livreDoPlano(ym, d) {
+    const p = cfg.planosMes[ym], aps = p.aportes || [];
+    const renda = Math.max(d.entrou, p.renda || 0);
+    const aportes = aps.reduce((a, ap) => a + Math.max(ap.valor || 0, guardadoEm(ym, ap.cx)), 0);
+    const outros = d.guardou - aps.reduce((a, ap) => a + guardadoEm(ym, ap.cx), 0);
+    return Math.max(0, renda - aportes - Math.max(0, outros));
   }
   function renderSobra(d) {
     // sem divisão fixa: mostra o que sobrou do que entrou
@@ -733,7 +744,8 @@ button { cursor: pointer; }
     if (mes < hojeYm) { $('pg-p').hidden = true; return; }
     const fixos = recorrentesDe(mes).map((r) => ({ dia: r.dia || 1, t: r.desc, done: r.feito, valor: r.valor, extra: 'todo mês', abrir: { tipo: 'gasto', cat: r.cat, valor: r.valor, desc: r.desc, rec: r.id, data: mes + '-' + String(Math.min(r.dia || 1, 28)).padStart(2, '0') } }));
     const passos = [];
-    if (pl === 'fixo') for (const a of cfg.aportesFixos || []) {
+    const apsPlano = pl === 'fixo' ? cfg.aportesFixos || [] : pl === 'mes' ? cfg.planosMes[mes].aportes || [] : [];
+    for (const a of apsPlano) {
       const feito = guardadoEm(mes, a.cx);
       passos.push({ dia: a.dia || 1, t: 'Guardar em ' + nomeCx(a.cx), done: feito >= a.valor, valor: a.valor, extra: feito > 0 && feito < a.valor ? `guardou ${brl(feito)}` : a.nota, abrir: { tipo: 'guardar', caixinha: a.cx, valor: Math.max(0, a.valor - feito), desc: '' } });
     }
@@ -944,7 +956,28 @@ button { cursor: pointer; }
     const d = doMes(mes);
     const pl = planoDe(mes);
     const rows = $('pl-rows'); rows.replaceChildren();
-    if (pl === 'fixo') {
+    const acoes = $('pl-acoes'); acoes.replaceChildren();
+    if (pl === 'mes') {
+      const p = cfg.planosMes[mes], aps = p.aportes || [];
+      const meta = livreDoPlano(mes, d), cor = PLANO_COR.livre;
+      const over = d.gastou > meta, w = meta ? Math.min(100, Math.max(0, d.gastou / meta * 100)) : 0;
+      $('pl-t').textContent = 'Plano de ' + monthF.format(ymDate(mes)).split(' ')[0];
+      $('pl-quando').textContent = 'só este mês';
+      $('pl-base').textContent = `Renda prevista de ${brl(p.renda || 0)}. Entrou ${brl(d.entrou)} até agora.`;
+      rows.append(h('div', { class: 'slice' },
+        h('div', { class: 'pct num', style: `color:${cor}` }, p.renda ? Math.round(meta / Math.max(p.renda, d.entrou) * 100) + '%' : '—'),
+        h('div', { style: 'display:grid;gap:5px;min-width:0' },
+          h('div', { style: 'display:flex;justify-content:space-between;gap:8px' }, h('b', null, 'Livre'), h('span', { class: 'num' }, brl(meta))),
+          h('div', { class: 'track' }, h('i', { style: `width:${w}%;background:${over ? 'var(--bad)' : cor}` })),
+          h('span', { class: 'sub' + (over ? ' neg' : '') }, 'Gastou ' + brl(d.gastou) + (over ? ` · passou ${brl(d.gastou - meta)}` : '')))));
+      if (aps.length) rows.append(h('div', { class: 'slice' },
+        h('div', { class: 'pct num', style: 'color:var(--muted)' }, ''),
+        h('div', { style: 'display:grid;gap:5px;min-width:0' },
+          h('div', { style: 'display:flex;justify-content:space-between;gap:8px' }, h('b', null, 'Guardar'), h('span', { class: 'num' }, brl(aps.reduce((a, ap) => a + (ap.valor || 0), 0)))),
+          h('div', { class: 'aps' }, aps.map((ap) => { const cx = cxById(ap.cx); return apRow(nomeCx(ap.cx), ap, guardadoEm(mes, ap.cx), (cx && GRUPOS[cx.grupo] || {}).cor || 'var(--muted)', () => openPlanoMes(mes)); })))));
+      $('pl-nota').textContent = p.nota || '';
+      acoes.append(h('button', { class: 'btn alt', type: 'button', onclick: () => openPlanoMes(mes) }, 'Editar plano do mês'));
+    } else if (pl === 'fixo') {
       const base = cfg.rendaPrevista || 0;
       $('pl-t').textContent = 'Divisão do salário';
       $('pl-quando').textContent = 'desde ' + mShort(cfg.divisaoDesde || mes) + '/' + (cfg.divisaoDesde || mes).slice(2, 4);
@@ -964,11 +997,13 @@ button { cursor: pointer; }
             aps.length ? h('div', { class: 'aps' }, aps.map(([ap, i]) => apRow(nomeCx(ap.cx) + (ap.nota ? ` (${ap.nota})` : ''), ap, guardadoEm(mes, ap.cx), cor, () => openAporte(i)))) : null)));
       }
       $('pl-nota').textContent = cfg.notaPlano || '';
+      acoes.append(h('button', { class: 'btn alt', type: 'button', onclick: () => openPlanoMes(mes) }, 'Mudar só este mês'));
     } else {
       $('pl-t').textContent = 'Plano do mês'; $('pl-quando').textContent = '';
       const prox = cfg.rendaPrevista && cfg.divisaoDesde > mes ? cfg.divisaoDesde : '';
-      $('pl-base').textContent = prox ? `Não tinha plano em ${monthF.format(ymDate(mes))}. O plano começa em ${monthF.format(ymDate(prox))}.` : 'Ainda sem plano. Preencha a renda prevista e a divisão logo abaixo para o Plin dividir o mês em potes.';
+      $('pl-base').textContent = prox ? `Ainda sem plano em ${monthF.format(ymDate(mes))}. A divisão fixa começa em ${monthF.format(ymDate(prox))}, mas você pode fazer um plano só para este mês.` : 'Ainda sem plano. Faça um plano só para este mês, ou preencha a renda prevista e a divisão logo abaixo para valer todo mês.';
       $('pl-nota').textContent = '';
+      acoes.append(h('button', { class: 'btn', type: 'button', onclick: () => openPlanoMes(mes) }, 'Fazer plano para ' + monthF.format(ymDate(mes)).split(' ')[0]));
     }
     // aportes fixos (quanto guardar por mês em cada caixinha)
     const afs = cfg.aportesFixos || [];
@@ -1462,6 +1497,60 @@ button { cursor: pointer; }
       const rec = { cx: cxSel.value, pote: pote.value, valor: v, dia: d, nota: nota.value.trim() };
       if (ap) lista[i] = rec; else lista.push(rec);
       sh.close(); render(); await salvarCfg(); toast('Salvo.');
+    });
+  }
+
+  // plano só de um mês: renda prevista e quanto guardar em cada caixinha; o resto é Livre
+  function openPlanoMes(ym) {
+    if (bloqueado()) return;
+    const planos = cfg.planosMes || {};
+    const atual = planos[ym];
+    const ant = planos[addMonths(ym, -1)];
+    const entrouAnt = doMes(addMonths(ym, -1)).entrou;
+    const base = atual || ant || { renda: cfg.rendaPrevista || entrouAnt || 0, aportes: (cfg.aportesFixos || []).map((a) => ({ cx: a.cx, valor: a.valor, dia: a.dia })) };
+    const renda = moneyInput(base.renda); renda.id = 'pm-renda';
+    const nota = h('input', { type: 'text', id: 'pm-nota', value: atual ? atual.nota || '' : '', placeholder: 'Opcional' });
+    const lista = h('div', { class: 'stack', style: 'gap:8px' });
+    const resumo = h('p', { class: 'sub num' });
+    const linhas = [];
+    const conta = () => {
+      const r = parseCent(renda.value) || 0;
+      const g = linhas.reduce((a, l) => a + (parseCent(l.valor.value) || 0), 0);
+      const livre = r - g;
+      resumo.textContent = `Guardar ${brl(g)} · Livre ${livre < 0 ? '− ' : ''}${brl(Math.abs(livre))}`;
+      resumo.className = 'sub num' + (livre < 0 ? ' neg' : '');
+    };
+    const addLinha = (ap) => {
+      if (!cfg.caixinhas.length) { toast('Crie uma caixinha primeiro, na aba Caixinhas.'); return; }
+      const cx = h('select', { 'aria-label': 'Caixinha' }, cfg.caixinhas.map((c) => h('option', { value: c.id }, c.nome)));
+      cx.value = ap && cxById(ap.cx) ? ap.cx : cfg.caixinhas[0].id;
+      const valor = moneyInput(ap && ap.valor); valor.setAttribute('aria-label', 'Valor');
+      valor.addEventListener('input', conta);
+      const l = { cx, valor, dia: ap && ap.dia };
+      const tirar = h('button', { class: 'x', type: 'button', 'aria-label': 'Tirar', onclick: () => { linhas.splice(linhas.indexOf(l), 1); el.remove(); conta(); } }, 'Tirar');
+      const el = h('div', { style: 'display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;gap:8px;align-items:center' }, cx, valor, tirar);
+      linhas.push(l); lista.append(el); conta();
+    };
+    for (const ap of base.aportes || []) if (cxById(ap.cx)) addLinha(ap);
+    renda.addEventListener('input', conta); conta();
+    const nomeMes = monthF.format(ymDate(ym)).split(' ')[0];
+    const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, 'Salvar plano');
+    const body = h('div', { class: 'stack', style: 'gap:12px' },
+      h('p', { class: 'sub' }, `Vale só para ${nomeMes}` + (planoDe(ym) === 'fixo' && !atual ? ', no lugar da divisão fixa' : '') + '. O que sobrar da renda depois de guardar é o Livre, que aparece no Mês e no "pode gastar por dia".' + (!atual && ant ? ' Já veio preenchido com o plano do mês anterior.' : '')),
+      field('Renda prevista no mês', renda),
+      h('div', { class: 'field' }, h('span', null, 'Guardar nas caixinhas'), lista,
+        h('div', { class: 'row-btns' }, h('button', { class: 'btn alt', type: 'button', onclick: () => addLinha() }, 'Adicionar caixinha'))),
+      resumo,
+      field('Observação', nota),
+      h('div', { class: 'row-btns' }, save,
+        atual ? dangerBtn('Apagar plano', async () => { delete cfg.planosMes[ym]; sh.close(); render(); await salvarCfg(); toast('Plano apagado.'); }) : null));
+    const sh = sheet('Plano de ' + nomeMes, body);
+    save.addEventListener('click', async () => {
+      const r = parseCent(renda.value);
+      if (!(r > 0)) { toast('Digite a renda prevista.'); return; }
+      const aportes = linhas.map((l) => ({ cx: l.cx.value, valor: parseCent(l.valor.value) || 0, ...(l.dia ? { dia: l.dia } : {}) })).filter((a) => a.valor > 0);
+      cfg.planosMes = { ...(cfg.planosMes || {}), [ym]: { renda: r, aportes, nota: nota.value.trim() } };
+      sh.close(); render(); await salvarCfg(); toast('Plano salvo.');
     });
   }
 
