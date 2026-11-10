@@ -200,6 +200,12 @@ button { cursor: pointer; }
 .ap .v { font-variant-numeric: tabular-nums; font-size: .86rem; white-space: nowrap; }
 .ap .track { grid-column: 1 / -1; height: 6px; }
 .ap .sub { grid-column: 1 / -1; font-size: .76rem; }
+.padrao summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; }
+.padrao summary::-webkit-details-marker { display: none; }
+.padrao summary > span:first-child { display: grid; gap: 2px; }
+.padrao .chev { width: 10px; height: 10px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); margin-right: 4px; transition: transform .2s; }
+.padrao[open] .chev { transform: rotate(-135deg); }
+.padrao:not([open]) { gap: 0; }
 .aps { display: grid; gap: 2px; margin-top: 4px; }
 .ok-pill { display: inline-block; font-size: .7rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--mint-soft); color: var(--mint); margin-left: 6px; }
 .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -315,12 +321,25 @@ button { cursor: pointer; }
       <p class="sub" id="pl-nota"></p>
       <div class="row-btns" id="pl-acoes"></div>
     </div>
-    <div class="panel">
-      <h2>Aportes fixos</h2>
-      <p class="sub">Quanto você quer guardar todo mês em cada caixinha. Só entram no plano e no checklist quando a renda prevista está preenchida.</p>
+    <details class="panel padrao" id="padrao">
+      <summary><span><h2>Plano padrão</h2><span class="sub" id="pp-quando"></span></span><span class="chev" aria-hidden="true"></span></summary>
+      <p class="sub">O que vale todo mês que não tem plano próprio: a divisão da renda em potes e quanto guardar em cada caixinha. Para um mês diferente, use "Mudar só este mês" no plano lá em cima.</p>
+      <div class="two">
+        <label class="field"><span>Renda prevista por mês (R$)</span><input id="cfg-renda" inputmode="decimal" type="text"></label>
+        <label class="field"><span>Vale a partir de</span><input id="cfg-desde" type="month"></label>
+      </div>
+      <div class="two">
+        <label class="field"><span>Livre %</span><input id="cfg-livre" inputmode="numeric" type="text"></label>
+        <label class="field"><span>Investimentos %</span><input id="cfg-investimentos" inputmode="numeric" type="text"></label>
+        <label class="field"><span>Viagens %</span><input id="cfg-viagens" inputmode="numeric" type="text"></label>
+        <label class="field"><span>13º %</span><input id="cfg-decimo" inputmode="numeric" type="text"></label>
+      </div>
+      <p class="sub" id="cfg-soma">—</p>
+      <div class="row-btns"><button class="btn" type="button" id="cfg-save">Salvar divisão</button></div>
+      <div class="label" style="margin-top:4px">Guardar todo mês</div>
       <div id="af-list"></div>
-      <div class="row-btns"><button class="btn alt" type="button" id="af-new">Adicionar aporte fixo</button></div>
-    </div>
+      <div class="row-btns"><button class="btn alt" type="button" id="af-new">Adicionar aporte</button></div>
+    </details>
     <div class="panel">
       <h2>Gastos fixos (todo mês)</h2>
       <p class="sub">Assinaturas e contas que se repetem. Entram no checklist do mês e já são descontadas do "pode gastar por dia".</p>
@@ -337,22 +356,6 @@ button { cursor: pointer; }
       <p class="sub">O que foge do mês normal e você já sabe que vem. Toque para marcar como pago ou editar.</p>
       <div id="pj-list"></div>
       <div class="row-btns"><button class="btn alt" type="button" id="pj-new">Adicionar</button></div>
-    </div>
-    <div class="panel">
-      <h2>Ajustar a divisão fixa</h2>
-      <p class="sub">Com a renda prevista preenchida, o Plin divide o mês em potes. O pote Livre é o que dá para gastar; os outros você enche guardando nas caixinhas.</p>
-      <div class="two">
-        <label class="field"><span>Renda prevista por mês (R$)</span><input id="cfg-renda" inputmode="decimal" type="text"></label>
-        <label class="field"><span>Vale a partir de</span><input id="cfg-desde" type="month"></label>
-      </div>
-      <div class="two">
-        <label class="field"><span>Livre %</span><input id="cfg-livre" inputmode="numeric" type="text"></label>
-        <label class="field"><span>Investimentos %</span><input id="cfg-investimentos" inputmode="numeric" type="text"></label>
-        <label class="field"><span>Viagens %</span><input id="cfg-viagens" inputmode="numeric" type="text"></label>
-        <label class="field"><span>13º %</span><input id="cfg-decimo" inputmode="numeric" type="text"></label>
-      </div>
-      <p class="sub" id="cfg-soma">—</p>
-      <div class="row-btns"><button class="btn" type="button" id="cfg-save">Salvar divisão</button></div>
     </div>
   </section>
 
@@ -412,7 +415,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '1.10';
+  const VERSAO = '1.11';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -967,7 +970,8 @@ button { cursor: pointer; }
       const over = d.gastou > meta, w = meta ? Math.min(100, Math.max(0, d.gastou / meta * 100)) : 0;
       $('pl-t').textContent = 'Plano de ' + monthF.format(ymDate(mes)).split(' ')[0];
       $('pl-quando').textContent = 'só este mês';
-      $('pl-base').textContent = `Renda prevista de ${brl(p.renda || 0)}. Entrou ${brl(d.entrou)} até agora.`;
+      const temPadrao = !!(cfg.rendaPrevista && mes >= (cfg.divisaoDesde || '0000-00'));
+      $('pl-base').textContent = `Renda prevista de ${brl(p.renda || 0)}. Entrou ${brl(d.entrou)} até agora.` + (temPadrao ? ' Vale no lugar do plano padrão.' : '');
       rows.append(h('div', { class: 'slice' },
         h('div', { class: 'pct num', style: `color:${cor}` }, p.renda ? Math.round(meta / Math.max(p.renda, d.entrou) * 100) + '%' : '—'),
         h('div', { style: 'display:grid;gap:5px;min-width:0' },
@@ -980,11 +984,12 @@ button { cursor: pointer; }
           h('div', { style: 'display:flex;justify-content:space-between;gap:8px' }, h('b', null, 'Guardar'), h('span', { class: 'num' }, brl(aps.reduce((a, ap) => a + (ap.valor || 0), 0)))),
           h('div', { class: 'aps' }, aps.map((ap) => { const cx = cxById(ap.cx); return apRow(nomeCx(ap.cx), ap, guardadoEm(mes, ap.cx), (cx && GRUPOS[cx.grupo] || {}).cor || 'var(--muted)', () => openPlanoMes(mes)); })))));
       $('pl-nota').textContent = p.nota || '';
-      acoes.append(h('button', { class: 'btn alt', type: 'button', onclick: () => openPlanoMes(mes) }, 'Editar plano do mês'));
+      acoes.append(h('button', { class: 'btn alt', type: 'button', onclick: () => openPlanoMes(mes) }, 'Editar plano do mês'),
+        h('button', { class: 'btn alt', type: 'button', onclick: () => tirarPlanoMes(mes) }, temPadrao ? 'Voltar ao padrão' : 'Apagar plano'));
     } else if (pl === 'fixo') {
       const base = cfg.rendaPrevista || 0;
-      $('pl-t').textContent = 'Divisão do salário';
-      $('pl-quando').textContent = 'desde ' + mShort(cfg.divisaoDesde || mes) + '/' + (cfg.divisaoDesde || mes).slice(2, 4);
+      $('pl-t').textContent = 'Plano de ' + monthF.format(ymDate(mes)).split(' ')[0];
+      $('pl-quando').textContent = 'plano padrão';
       $('pl-base').textContent = `${mLong(mes)}, sobre a renda prevista de ${brl(base)}. Entrou ${brl(d.entrou)} até agora.`;
       for (const [k, nome, cor] of PLANO) {
         const pct = cfg.divisao[k] || 0, meta = Math.round(base * pct / 100);
@@ -1009,6 +1014,9 @@ button { cursor: pointer; }
       $('pl-nota').textContent = '';
       acoes.append(h('button', { class: 'btn', type: 'button', onclick: () => openPlanoMes(mes) }, 'Fazer plano para ' + monthF.format(ymDate(mes)).split(' ')[0]));
     }
+    // plano padrão (fica fechado; abre com um toque)
+    const desde = cfg.divisaoDesde;
+    $('pp-quando').textContent = !cfg.rendaPrevista ? 'ainda não preenchido' : (desde ? `a partir de ${mShort(desde)}/${desde.slice(2, 4)}` : 'todo mês') + (pl !== 'fixo' ? ` · não vale em ${mShort(mes)}` : '');
     // aportes fixos (quanto guardar por mês em cada caixinha)
     const afs = cfg.aportesFixos || [];
     $('af-list').replaceChildren(...(afs.length ? afs.map((ap, i) => { const cx = cxById(ap.cx); return h('button', { class: 'en', type: 'button', onclick: () => openAporte(i) }, h('span', { class: 't' }, nomeCx(ap.cx)), h('span', { class: 'v' }, brl(ap.valor)), h('span', { class: 'meta' }, h('span', { class: 'tag' }, h('i', { style: `background:${PLANO_COR[ap.pote] || 'var(--muted)'};border-radius:50%` }), 'pote ' + (potesRot[ap.pote] || '?')), `dia ${ap.dia || 1}` + (ap.nota ? ' · ' + ap.nota : '') + (cx ? '' : ' · caixinha removida'))); }) : [h('div', { class: 'empty' }, cfg.caixinhas.length ? 'Nenhum aporte fixo ainda.' : 'Crie uma caixinha primeiro, na aba Caixinhas.')]));
@@ -1536,6 +1544,12 @@ button { cursor: pointer; }
     });
   }
 
+  async function tirarPlanoMes(ym) {
+    if (bloqueado()) return;
+    const antes = cfg.planosMes[ym];
+    delete cfg.planosMes[ym]; render(); await salvarCfg();
+    toast('Plano de ' + monthF.format(ymDate(ym)).split(' ')[0] + ' apagado.', { label: 'Desfazer', fn: async () => { cfg.planosMes = { ...(cfg.planosMes || {}), [ym]: antes }; render(); await salvarCfg(); } });
+  }
   // plano só de um mês: renda prevista e quanto guardar em cada caixinha; o resto é Livre
   function openPlanoMes(ym) {
     if (bloqueado()) return;
