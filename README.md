@@ -30,6 +30,16 @@ Em **Settings → Pages**, escolha *Deploy from a branch*, branch `main`, pasta 
 
 Ao publicar uma versão nova, mude `VERSAO` em `sw.js` (e em `index.html`) para o navegador trocar o cache.
 
+### Versões
+
+O número da versão é `x.y.z`:
+
+- `x` sobe numa mudança grande (o app muda de cara ou de jeito de guardar os dados);
+- `y` sobe numa função nova (e o `z` volta pra 0);
+- `z` sobe numa correção de bug.
+
+Exemplo: de `1.11.0`, uma correção vira `1.11.1`, uma função nova vira `1.12.0`.
+
 ## Arquivos
 
 - `index.html`: o app inteiro (HTML, CSS e JavaScript sem dependências; só as fontes vêm do Google Fonts).
