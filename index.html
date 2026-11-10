@@ -145,7 +145,10 @@ button { cursor: pointer; }
 .pad button:active { background: var(--line); }
 .scrim { position: fixed; inset: 0; background: rgba(8, 11, 22, .5); z-index: 30; display: flex; align-items: flex-end; justify-content: center; }
 .sheet { width: 100%; max-width: 34rem; max-height: 94%; overflow: auto; background: var(--panel); border-radius: 22px 22px 0 0; padding: 10px max(16px, env(safe-area-inset-left, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.sheet-top { display: grid; gap: 12px; touch-action: none; margin: -10px -16px 0; padding: 10px 16px 0; cursor: grab; }
 .grab { width: 40px; height: 4px; border-radius: 2px; background: var(--line); justify-self: center; }
+.sheet.drag { transition: none !important; }
+.sheet.solta { transition: transform .2s ease; }
 .sheet-h { display: flex; justify-content: space-between; align-items: center; }
 .sheet-h h2 { margin: 0; font-size: 1.05rem; }
 .x { border: 0; background: var(--field); border-radius: 10px; padding: 6px 10px; font-weight: 600; font-size: .84rem; }
@@ -415,7 +418,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '1.11';
+  const VERSAO = '1.11.1';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -1160,9 +1163,38 @@ button { cursor: pointer; }
     const close = () => { root.replaceChildren(); document.removeEventListener('keydown', esc); };
     const esc = (e) => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', esc);
-    const sh = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title }, h('div', { class: 'grab' }), h('div', { class: 'sheet-h' }, h('h2', null, title), h('button', { class: 'x', type: 'button', onclick: close }, 'Fechar')), body);
-    const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim) close(); } }, sh);
+    const topo = h('div', { class: 'sheet-top' }, h('div', { class: 'grab' }), h('div', { class: 'sheet-h' }, h('h2', null, title), h('button', { class: 'x', type: 'button', onclick: close }, 'Fechar')));
+    const sh = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title }, topo, body);
+    let downFora = false; // só fecha pelo fundo se o toque começou no fundo (a captura do arraste pode mandar o click pro fundo)
+    const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim && downFora) close(); } }, sh);
+    scrim.addEventListener('pointerdown', (e) => { downFora = e.target === scrim; }, true);
     root.replaceChildren(scrim);
+    // arrastar pra baixo pela alça (ou pelo título) fecha a folha
+    let y0 = null, t0 = 0, dy = 0, pid = null;
+    topo.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      y0 = e.clientY; t0 = performance.now(); dy = 0; pid = e.pointerId;
+      try { topo.setPointerCapture(pid); } catch (_) {}
+      sh.classList.remove('solta'); sh.classList.add('drag');
+    });
+    topo.addEventListener('pointermove', (e) => {
+      if (y0 === null || e.pointerId !== pid) return;
+      dy = Math.max(0, e.clientY - y0);
+      sh.style.transform = dy ? `translateY(${dy}px)` : '';
+      scrim.style.background = `rgba(8, 11, 22, ${0.5 * Math.max(0, 1 - dy / (sh.offsetHeight || 400))})`;
+    });
+    const soltar = (e) => {
+      if (y0 === null || (e && e.pointerId !== pid)) return;
+      const vel = dy / Math.max(1, performance.now() - t0);
+      y0 = null; sh.classList.remove('drag'); sh.classList.add('solta');
+      if (dy > Math.min(120, sh.offsetHeight * 0.25) || (dy > 30 && vel > 0.5)) {
+        sh.style.transform = `translateY(${sh.offsetHeight + 40}px)`;
+        scrim.style.transition = 'background .2s ease'; scrim.style.background = 'rgba(8, 11, 22, 0)';
+        setTimeout(close, 190);
+      } else { sh.style.transform = ''; scrim.style.background = ''; }
+    };
+    topo.addEventListener('pointerup', soltar);
+    topo.addEventListener('pointercancel', soltar);
     return { close, el: sh };
   }
   function dangerBtn(label, action) {
