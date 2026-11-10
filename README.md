@@ -9,7 +9,7 @@ Caderneta de bolso para o dinheiro do mês: anotar gastos e entradas, guardar em
 - **Mês**: pote "Livre" (quanto ainda dá para gastar), quanto dá por dia, extrato por dia, busca em todos os meses, checklist de aportes e contas fixas, tetos por categoria e fechamento do mês anterior (guardar a sobra numa caixinha).
 - **Anotar**: teclado numérico, tipos Gasto, Entrada, Guardar e Resgatar; gasto pode sair de uma caixinha; parcelado (vira uma parcela por mês); atalhos para gastos frequentes; sugestão de categoria pela descrição; valor em US$ ou € com cotação.
 - **Caixinhas**: saldo, meta, banco, rendimento e resgate; meta que soma o saldo de outras caixinhas.
-- **Plano**: divisão da renda prevista em potes (Livre, Investimentos, Viagens, 13º), aportes fixos, gastos fixos (assinaturas), lembretes e gastos planejados.
+- **Plano**: divisão da renda prevista em potes (Livre, Investimentos, Viagens, 13º), plano só de um mês (renda prevista + quanto guardar em cada caixinha, para meses fora da divisão fixa ou para mudar um mês), aportes fixos, gastos fixos (assinaturas), lembretes e gastos planejados.
 - **Gráficos**: gasto por categoria, mês a mês e maiores gastos do período.
 - **Config**: categorias (com cor, teto e arquivar), planilha .csv para o Excel e backup .json.
 
