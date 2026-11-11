@@ -38,7 +38,7 @@ O número da versão é `x.y.z`:
 - `y` sobe numa função nova (e o `z` volta pra 0);
 - `z` sobe numa correção de bug.
 
-Exemplo: de `1.11.0`, uma correção vira `1.11.1`, uma função nova vira `1.12.0`.
+Exemplo: de `2.11.0`, uma correção vira `2.11.1`, uma função nova vira `2.12.0`. O money_app usa o mesmo número do Plin do artifact (começou em 2.x).
 
 ## Arquivos
 
