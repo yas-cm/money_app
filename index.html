@@ -114,6 +114,9 @@ button { cursor: pointer; }
 .slice .pct { font-family: var(--display); font-weight: 700; font-size: 1.25rem; }
 .track { height: 8px; border-radius: 4px; background: var(--field); overflow: hidden; }
 .track i { display: block; height: 100%; border-radius: 4px; transition: width .5s; }
+.rend-l { all: unset; cursor: pointer; display: block; font-size: .82rem; color: var(--muted, #888); margin-top: 8px; line-height: 1.4; }
+.rend-l b { color: inherit; font-weight: 600; }
+.aprox { font-size: .78rem; opacity: .75; }
 .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .catrow { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; font-size: .88rem; padding: 4px 0; }
 .catrow .p { color: var(--muted); font-size: .78rem; min-width: 2.6rem; text-align: right; }
@@ -133,8 +136,9 @@ button { cursor: pointer; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .swatch { width: 30px; height: 30px; border-radius: 9px; border: 2px solid transparent; }
 .swatch[aria-pressed="true"] { border-color: var(--ink); }
-.kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.kinds button { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 8px 2px; font-weight: 600; font-size: .84rem; }
+.kinds { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.kinds button { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 8px 1px; font-weight: 600; font-size: .8rem; min-width: 0; overflow-wrap: anywhere; }
+.troca { justify-self: center; margin: -4px 0; }
 .kinds button[aria-pressed="true"] { border-color: var(--tang); background: var(--tang-soft); }
 .amount { text-align: center; padding: 6px 0 2px; }
 .amount .cur { font-size: .9rem; color: var(--muted); font-weight: 600; margin-right: 4px; }
@@ -311,9 +315,10 @@ button { cursor: pointer; }
       <div class="big num" id="cx-total">—</div>
       <div class="ribbon" id="cx-ribbon"></div>
       <div class="chips" id="cx-legend" style="font-size:.8rem"></div>
+      <button class="rend-l" type="button" id="cx-rend"></button>
     </div>
     <div id="cx-list" class="stack" style="gap:18px"></div>
-    <button class="btn alt" type="button" id="cx-new">Nova caixinha</button>
+    <div class="row-btns"><button class="btn alt" type="button" id="cx-transf" style="flex:1">Transferir</button><button class="btn alt" type="button" id="cx-new" style="flex:1">Nova caixinha</button></div>
   </section>
 
   <section id="plano" data-screen hidden class="stack">
@@ -418,7 +423,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.11.1';
+  const VERSAO = '2.13.1';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -485,7 +490,7 @@ button { cursor: pointer; }
     outros: { nome: 'Outros', cor: '#6b7891' },
   };
   const PLANO = [['livre', 'Livre', '#17a387'], ['investimentos', 'Investimentos', '#5b6cf0'], ['viagens', 'Viagens', '#c2459a'], ['decimo', '13º', '#f2662e']];
-  const TIPOS = [['gasto', 'Gasto'], ['entrada', 'Entrada'], ['guardar', 'Guardar'], ['resgatar', 'Resgatar']];
+  const TIPOS = [['gasto', 'Gasto'], ['entrada', 'Entrada'], ['guardar', 'Guardar'], ['resgatar', 'Resgatar'], ['transferir', 'Transferir']];
 
   // ---------- estado ----------
   // cfg: um documento (plin/config). Lançamentos: um documento por mês (meses/AAAA-MM -> {itens: [...]}).
@@ -585,20 +590,110 @@ button { cursor: pointer; }
   const catsOf = (t) => cfg.categorias[t === 'entrada' ? 'entrada' : 'gasto'] || [];
   const catById = (t, id) => catsOf(t).find((c) => c.id === id) || { nome: 'Sem categoria', cor: '#9aa0b0' };
   const cxById = (id) => cfg.caixinhas.find((c) => c.id === id);
-  // lançamentos que mexem no saldo da caixinha: guardar, resgatar e gasto que saiu dela
-  const mexeCx = (l, id) => l.caixinha === id || (l.tipo === 'gasto' && l.origem === id);
+  // quanto um lançamento mexe no saldo de uma caixinha (transferir: sai de l.caixinha e entra em l.para; não mexe no Livre)
+  function movCx(l, id) {
+    if (l.tipo === 'guardar') return l.caixinha === id ? l.valor : 0;
+    if (l.tipo === 'resgatar') return l.caixinha === id ? -l.valor : 0;
+    if (l.tipo === 'gasto') return l.origem === id ? -l.valor : 0;
+    if (l.tipo === 'transferir') return l.caixinha === id ? -l.valor : l.para === id ? l.valor : 0;
+    return 0;
+  }
+  // lançamentos que mexem no saldo da caixinha: guardar, resgatar, transferir e gasto que saiu dela
+  const mexeCx = (l, id) => movCx(l, id) !== 0;
   // entra no saldo o que foi anotado depois do último saldo informado e cuja data já chegou
   const contaNoSaldo = (l, cx) => mexeCx(l, cx.id) && (l.criadoEm || 0) > (cx.baseEm || 0) && l.data <= todayISO();
   function saldoCx(cx) {
     let v = cx.saldoBase || 0;
     for (const l of all()) {
-      if (!contaNoSaldo(l, cx)) continue;
-      if (l.tipo === 'guardar' && l.caixinha === cx.id) v += l.valor;
-      else if (l.tipo === 'resgatar' && l.caixinha === cx.id) v -= l.valor;
-      else if (l.tipo === 'gasto' && l.origem === cx.id) v -= l.valor;
+      if (contaNoSaldo(l, cx)) v += movCx(l, cx.id);
     }
     return v;
   }
+  // ---------- rendimento estimado (aprox.) ----------
+  // Cada caixinha pode ter rendeAuto {tipo:'cdi'|'pre'|'nao', taxa}. Sem ele, o Plin tenta entender o texto "Rende" (ex.: "115% CDI", "15% a.a.", "100–104% CDI" vira a média).
+  // O rendimento nunca é gravado: é recalculado a cada tela, por dia útil, desde rendeDesde (ou desde a última correção do saldo).
+  const CDI_PADRAO = 13.65; // Selic 13,75% (Copom 04/11/2026) menos ~0,10
+  function parseRende(t) {
+    t = String(t || '').toLowerCase();
+    const ns = (t.match(/\d+(?:[.,]\d+)?/g) || []).map((x) => Number(x.replace(',', '.'))).filter((x) => x > 0);
+    if (!ns.length) return null;
+    const taxa = Math.round(ns.reduce((a, b) => a + b, 0) / ns.length * 100) / 100;
+    if (/cdi/.test(t)) return { tipo: 'cdi', taxa };
+    if (/a\.?\s?a|ano/.test(t)) return { tipo: 'pre', taxa };
+    return null;
+  }
+  const rendeDe = (cx) => cx.rendeAuto || parseRende(cx.rende) || { tipo: 'nao', taxa: 0 };
+  const isoDia = (ms) => { const d = new Date(ms); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+  const addDia = (iso, k) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + k); return d.toISOString().slice(0, 10); };
+  const dmCurto = (iso) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
+  const feriadosAno = {};
+  function feriados(y) {
+    if (feriadosAno[y]) return feriadosAno[y];
+    // Páscoa (algoritmo de Meeus) para os feriados móveis
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    const hh = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - hh - k) % 7, m = Math.floor((a + 11 * hh + 22 * l) / 451);
+    const mes = Math.floor((hh + l - 7 * m + 114) / 31), dia = ((hh + l - 7 * m + 114) % 31) + 1;
+    const pascoa = `${y}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+    const fixos = ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'].map((md) => `${y}-${md}`);
+    return (feriadosAno[y] = new Set([...fixos, addDia(pascoa, -48), addDia(pascoa, -47), addDia(pascoa, -2), addDia(pascoa, 60)]));
+  }
+  function diaUtil(iso) { const w = new Date(iso + 'T00:00:00Z').getUTCDay(); return w !== 0 && w !== 6 && !feriados(+iso.slice(0, 4)).has(iso); }
+  const cdis = () => (cfg.cdi && cfg.cdi.length ? [...cfg.cdi].sort((a, b) => a.desde.localeCompare(b.desde)) : [{ desde: '2000-01-01', taxa: CDI_PADRAO }]);
+  function cdiEm(iso) { const l = cdis(); let t = l[0].taxa; for (const x of l) if (x.desde <= iso) t = x.taxa; return t; }
+  const cdiAtual = () => cdiEm(todayISO());
+  function inicioRend(cx) {
+    const base = cx.baseEm ? isoDia(cx.baseEm) : '';
+    const desde = cx.rendeDesde || '';
+    if (!desde && !base) return '';
+    return desde > base ? desde : base;
+  }
+  function rendCx(cx) {
+    const r = rendeDe(cx);
+    if (r.tipo === 'nao' || !(r.taxa > 0)) return 0;
+    const ini = inicioRend(cx);
+    const hoje = todayISO();
+    if (!ini || ini >= hoje) return 0;
+    let b = cx.saldoBase || 0; const movs = {};
+    for (const l of all()) {
+      if ((l.criadoEm || 0) <= (cx.baseEm || 0)) continue;
+      const v = movCx(l, cx.id);
+      if (!v) continue;
+      if (l.data < ini) b += v; else movs[l.data] = (movs[l.data] || 0) + v;
+    }
+    let rend = 0;
+    for (let d = ini; d < hoje; d = addDia(d, 1)) {
+      b += movs[d] || 0;
+      if (!diaUtil(d) || b <= 0) continue;
+      const f = r.tipo === 'cdi' ? r.taxa / 100 * (Math.pow(1 + cdiEm(d) / 100, 1 / 252) - 1) : Math.pow(1 + r.taxa / 100, 1 / 252) - 1;
+      const g = b * f; rend += g; b += g;
+    }
+    return Math.round(rend);
+  }
+  const saldoEst = (cx) => saldoCx(cx) + rendCx(cx);
+  const rendeTxt = (r) => (r.tipo === 'cdi' ? `${n2.format(r.taxa).replace(/,00$/, '')}% do CDI` : r.tipo === 'pre' ? `${n2.format(r.taxa).replace(/,00$/, '')}% ao ano` : 'não rende');
+
+  function openCdi() {
+    if (bloqueado()) return;
+    const taxa = h('input', { type: 'text', inputmode: 'decimal', id: 'cdi-taxa', value: n2.format(cdiAtual()) });
+    const desde = h('input', { type: 'date', id: 'cdi-desde', value: todayISO() });
+    const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, 'Salvar');
+    const hist = cdis().filter(() => cfg.cdi && cfg.cdi.length).reverse();
+    const body = h('div', { class: 'stack', style: 'gap:12px' },
+      h('p', { class: 'sub' }, 'O CDI fica sempre uns 0,10 abaixo da Selic, e só muda quando o Copom muda a Selic (8 reuniões por ano). Atualize aqui quando sair notícia de mudança. O rendimento de antes continua com o CDI antigo.'),
+      h('div', { class: 'two' }, field('CDI (% ao ano)', taxa), field('Vale desde', desde)),
+      hist.length ? h('p', { class: 'sub' }, 'Histórico: ' + hist.map((x) => `${n2.format(x.taxa)}% desde ${x.desde.split('-').reverse().join('/')}`).join(' · ')) : h('p', { class: 'sub' }, `Usando ${n2.format(CDI_PADRAO)}% (Selic de 13,75% em nov/2026).`),
+      h('div', { class: 'row-btns' }, save));
+    const sh = sheet('CDI', body);
+    save.addEventListener('click', async () => {
+      const t = Number(String(taxa.value).replace(/\s|%/g, '').replace(',', '.'));
+      if (!(t > 0 && t < 100)) { toast('CDI inválido.'); return; }
+      if (!desde.value) { toast('Escolha a data.'); return; }
+      const lista = (cfg.cdi && cfg.cdi.length ? cfg.cdi : [{ desde: '2026-11-01', taxa: CDI_PADRAO }]).filter((x) => x.desde !== desde.value);
+      cfg.cdi = [...lista, { desde: desde.value, taxa: Math.round(t * 100) / 100 }].sort((a, b) => a.desde.localeCompare(b.desde));
+      sh.close(); render(); await salvarCfg(); toast('CDI atualizado.');
+    });
+  }
+
   function doMes(ym) {
     const ls = meses[ym] || [];
     let entrou = 0, gastou = 0, gastoCx = 0, guardou = 0; const porGrupo = {};
@@ -878,7 +973,7 @@ button { cursor: pointer; }
     const q = ($('busca').value || '').trim().toLowerCase();
     $('busca-tot').textContent = '';
     if (q) {
-      const achou = all().filter((l) => (l.desc || '').toLowerCase().includes(q) || ((l.tipo === 'gasto' || l.tipo === 'entrada') && catById(l.tipo, l.cat).nome.toLowerCase().includes(q)) || (cxById(l.caixinha || l.origem) || { nome: '' }).nome.toLowerCase().includes(q));
+      const achou = all().filter((l) => (l.desc || '').toLowerCase().includes(q) || ((l.tipo === 'gasto' || l.tipo === 'entrada') && catById(l.tipo, l.cat).nome.toLowerCase().includes(q)) || [l.caixinha, l.origem, l.para].some((id) => (cxById(id) || { nome: '' }).nome.toLowerCase().includes(q)));
       const gastos = achou.filter((l) => l.tipo === 'gasto').reduce((a, l) => a + l.valor, 0);
       $('busca-tot').textContent = `${achou.length} achados` + (gastos ? ` · ${brl(gastos)} em gastos` : '');
       if (!achou.length) { box.append(h('div', { class: 'empty' }, 'Nada encontrado.')); return; }
@@ -912,6 +1007,12 @@ button { cursor: pointer; }
       tag = [h('span', { class: 'tag' }, h('i', { style: `background:${c.cor}` }), c.nome)];
       if (l.origem && cxById(l.origem)) tag.push(h('span', null, 'saiu da caixinha ' + cxById(l.origem).nome));
       valor = (l.tipo === 'gasto' ? '− ' : '+ ') + brl(l.valor); cls = l.tipo === 'entrada' ? 'pos' : '';
+    } else if (l.tipo === 'transferir') {
+      const de = cxById(l.caixinha), pa = cxById(l.para);
+      const bola = (cx) => h('i', { style: `background:${cx ? GRUPOS[cx.grupo].cor : '#999'};border-radius:50%` });
+      titulo = l.desc || 'Transferência';
+      tag = [h('span', { class: 'tag' }, bola(de), (de ? de.nome : 'caixinha removida') + ' → '), h('span', { class: 'tag' }, bola(pa), pa ? pa.nome : 'caixinha removida')];
+      valor = brl(l.valor); cls = 'muted';
     } else {
       const cx = cxById(l.caixinha);
       titulo = l.desc || (l.tipo === 'guardar' ? 'Guardado' : 'Resgatado');
@@ -922,9 +1023,13 @@ button { cursor: pointer; }
   }
 
   function renderCaixinhas() {
-    const cxs = cfg.caixinhas.map((c) => ({ ...c, atual: saldoCx(c) }));
+    const cxs = cfg.caixinhas.map((c) => { const rd = rendCx(c); return { ...c, rend: rd, atual: saldoCx(c) + rd }; });
     const total = cxs.reduce((a, c) => a + Math.max(0, c.atual), 0);
     $('cx-total').textContent = carregou ? brl(total) : '—';
+    const rendTot = cxs.reduce((a, c) => a + c.rend, 0);
+    const desdeMin = cxs.filter((c) => c.rend).map(inicioRend).sort()[0];
+    $('cx-rend').replaceChildren(rendTot ? h('span', null, 'Inclui ', h('b', null, '+' + brl(rendTot)), ' de rendimento aprox. desde ' + dmCurto(desdeMin) + ' · ') : h('span', null, 'Rendimento automático · '), `CDI ${n2.format(cdiAtual())}% · mudar`);
+
     const ks = Object.keys(GRUPOS).filter((k) => cxs.some((c) => c.grupo === k));
     const sum = (k) => cxs.filter((c) => c.grupo === k).reduce((a, c) => a + Math.max(0, c.atual), 0);
     $('cx-ribbon').replaceChildren(...ks.map((k) => h('i', { style: `width:${total ? sum(k) / total * 100 : 0}%;background:${GRUPOS[k].cor}`, title: GRUPOS[k].nome })));
@@ -943,9 +1048,10 @@ button { cursor: pointer; }
           return h('button', { class: 'tile', type: 'button', onclick: () => openCx(c.id) },
             h('span', { class: 'gauge' }, h('i', { style: `height:${p * 100}%;background:${GRUPOS[k].cor}` })),
             h('span', { class: 'nm' }, c.nome), h('span', { class: 'sv' }, brl(c.atual)),
+            c.rend ? h('span', { class: 'sub aprox' }, `+${brl(c.rend)} aprox. desde ${dmCurto(inicioRend(c))}`) : null,
             c.meta ? h('span', { class: 'sub' }, `${Math.floor(naMeta / c.meta * 100)}% de ${brl(c.meta)}` + (junto.length ? ` (${brl(naMeta)} com ${junto.map((x) => x.nome).join(' e ')})` : '') + (naMeta >= c.meta ? ' · meta batida!' : ` · faltam ${brl(c.meta - naMeta)}`)) : null,
             dono ? h('span', { class: 'sub' }, 'Conta na meta de ' + dono.nome) : null,
-            h('span', { class: 'sub' }, [c.banco, c.rende, c.resgate ? 'resgate ' + c.resgate : ''].filter(Boolean).join(' · ')),
+            h('span', { class: 'sub' }, [c.banco, c.rende || (rendeDe(c).tipo !== 'nao' ? rendeTxt(rendeDe(c)) : ''), c.resgate ? 'resgate ' + c.resgate : ''].filter(Boolean).join(' · ')),
             c.nota ? h('span', { class: 'sub' }, c.nota) : null);
         }))));
     }
@@ -1253,8 +1359,9 @@ button { cursor: pointer; }
 
   // no toast: avisa que o saldo da caixinha mudou sozinho
   function avisoCx(rec, antigo) {
-    const ids = new Set([rec.tipo === 'gasto' ? rec.origem : rec.caixinha, antigo && (antigo.tipo === 'gasto' ? antigo.origem : antigo.caixinha)].filter(Boolean));
-    const txt = [...ids].map(cxById).filter(Boolean).map((cx) => `${cx.nome} ficou com ${brl(saldoCx(cx))}`);
+    const doLanc = (x) => (x ? (x.tipo === 'gasto' ? [x.origem] : [x.caixinha, x.para]) : []);
+    const ids = new Set([...doLanc(rec), ...doLanc(antigo)].filter(Boolean));
+    const txt = [...ids].map(cxById).filter(Boolean).map((cx) => `${cx.nome} ficou com ${brl(saldoEst(cx))}`);
     return txt.length ? ' ' + txt.join(', ') + '.' : '';
   }
   function openLanc(l) {
@@ -1268,7 +1375,7 @@ button { cursor: pointer; }
       if (k === 'del') amt = amt.slice(0, -1);
       else if (k === ',') { if (!amt.includes(',')) amt = (amt || '0') + ','; }
       else { const dec = amt.split(',')[1]; if (dec != null && dec.length >= 2) return; if (amt.replace(',', '').length >= 9) return; amt = amt === '0' ? k : amt + k; }
-      paintAmt(); if (typeof paintConv === 'function' && convEl) paintConv(); if (typeof paintOrigem === 'function') paintOrigem();
+      paintAmt(); if (typeof paintConv === 'function' && convEl) paintConv(); paintTransf(); if (typeof paintOrigem === 'function') paintOrigem();
     };
     const pad = h('div', { class: 'pad' }, ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'del'].map((k) => h('button', { type: 'button', 'aria-label': k === 'del' ? 'Apagar' : k, onclick: () => press(k) }, k === 'del' ? '⌫' : k)));
     paintAmt();
@@ -1306,7 +1413,7 @@ button { cursor: pointer; }
       return Math.round(v * c / 100);
     }
     function paintConv() { convEl.hidden = moeda === 'brl'; if (moeda !== 'brl') convEl.textContent = '= ' + brlReal(emReais() || 0); paintParc(); }
-    cotIn.addEventListener('input', paintConv);
+    cotIn.addEventListener('input', () => { paintConv(); paintTransf(); });
     const data = h('input', { type: 'date', id: 'l-data', value: st.data });
     data.addEventListener('change', () => paintOrigem());
     const kinds = h('div', { class: 'kinds' });
@@ -1317,6 +1424,7 @@ button { cursor: pointer; }
     }
     const cats = h('div', { class: 'chips' });
     const extra = h('div', { class: 'stack', style: 'gap:12px' });
+    let paintTransf = () => {};
     const origemBox = h('div', { class: 'stack', style: 'gap:4px' });
     const origemInfo = h('p', { class: 'sub', id: 'l-origem-info' });
     // mostra quanto a caixinha fica depois do gasto (desconta sozinho, sem precisar mexer na aba Caixinhas)
@@ -1324,11 +1432,12 @@ button { cursor: pointer; }
       const cx = st.tipo === 'gasto' && st.origem ? cxById(st.origem) : null;
       origemInfo.hidden = !cx; if (!cx) return;
       const v = emReais() || 0;
-      const antes = saldoCx(cx) + (edit && l.origem === cx.id && contaNoSaldo(l, cx) ? l.valor : 0);
+      const antes = saldoEst(cx) + (edit && l.origem === cx.id && contaNoSaldo(l, cx) ? l.valor : 0);
       const futuro = data.value > todayISO();
       origemInfo.textContent = futuro ? `Desconta da caixinha ${cx.nome} no dia ${data.value.split('-').reverse().join('/')}.` : `Desconta da caixinha ${cx.nome}: fica com ${brl(antes - v)}.`;
     }
     function paint() {
+      paintTransf = () => {};
       kinds.replaceChildren(...TIPOS.map(([k, t]) => h('button', { type: 'button', 'aria-pressed': String(st.tipo === k), onclick: () => { st.tipo = k; if ((k === 'gasto' || k === 'entrada') && !catsOf(k).find((c) => c.id === st.cat)) st.cat = (catsOf(k)[0] || {}).id; paint(); } }, t)));
       cats.replaceChildren(); extra.replaceChildren();
       if (st.tipo === 'gasto' || st.tipo === 'entrada') {
@@ -1346,7 +1455,27 @@ button { cursor: pointer; }
         sel.value = st.origem || '';
         origemBox.replaceChildren(field('Saiu de', sel), origemInfo); origemBox.hidden = false; paintOrigem();
       } else { origemBox.replaceChildren(); origemBox.hidden = true; }
-      if (st.tipo !== 'gasto' && st.tipo !== 'entrada') {
+      if (st.tipo === 'transferir') {
+        cats.hidden = true;
+        const opts = () => cfg.caixinhas.map((c) => h('option', { value: c.id }, c.nome));
+        const outra = (id) => (cfg.caixinhas.find((c) => c.id !== id) || {}).id || '';
+        const de = h('select', { id: 'l-cx', onchange: (e) => { st.caixinha = e.target.value; if (st.para === st.caixinha) { st.para = outra(st.caixinha); pa.value = st.para; } paintTransf(); } }, opts());
+        const pa = h('select', { id: 'l-para', onchange: (e) => { st.para = e.target.value; if (st.para === st.caixinha) { st.caixinha = outra(st.para); de.value = st.caixinha; } paintTransf(); } }, opts());
+        de.value = cxById(st.caixinha) ? st.caixinha : (cfg.caixinhas[0] || {}).id || ''; st.caixinha = de.value;
+        pa.value = cxById(st.para) && st.para !== st.caixinha ? st.para : outra(st.caixinha); st.para = pa.value;
+        const sDe = h('p', { class: 'sub', style: 'margin-top:-6px' }), sPa = h('p', { class: 'sub', style: 'margin-top:-6px' });
+        const troca = h('button', { class: 'btn alt troca', type: 'button', 'aria-label': 'Inverter', onclick: () => { [st.caixinha, st.para] = [st.para, st.caixinha]; de.value = st.caixinha; pa.value = st.para; paintTransf(); } }, '⇅ inverter');
+        paintTransf = () => {
+          const v = emReais() || 0, a = cxById(st.caixinha), b = cxById(st.para);
+          const ant = edit && l.tipo === 'transferir' ? l : null; // ao editar, desconta a transferência antiga da prévia
+          const base = (cx) => (cx ? saldoEst(cx) - (ant && contaNoSaldo(ant, cx) ? movCx(ant, cx.id) : 0) : 0);
+          sDe.textContent = a ? `Tem ${brl(base(a))}` + (v ? ` · fica com ${brl(base(a) - v)}` : '') : '';
+          sPa.textContent = b ? `Tem ${brl(base(b))}` + (v ? ` · fica com ${brl(base(b) + v)}` : '') : '';
+          sDe.classList.toggle('neg', !!(a && v && base(a) - v < 0));
+        };
+        paintTransf();
+        extra.append(h('p', { class: 'sub' }, 'Sai de uma caixinha e entra na outra. Não mexe no Livre do mês.'), field('De qual caixinha', de), sDe, troca, field('Para qual caixinha', pa), sPa);
+      } else if (st.tipo !== 'gasto' && st.tipo !== 'entrada') {
         cats.hidden = true;
         const sel = h('select', { id: 'l-cx', onchange: (e) => { st.caixinha = e.target.value; } }, cfg.caixinhas.map((c) => h('option', { value: c.id }, c.nome)));
         sel.value = st.caixinha || (cfg.caixinhas[0] || {}).id || ''; st.caixinha = sel.value;
@@ -1383,6 +1512,11 @@ button { cursor: pointer; }
       }
       const rec = { id: edit ? l.id : uid(), tipo: st.tipo, valor: v, desc: dsc, data: data.value, criadoEm: edit ? (l.criadoEm || 0) : Date.now(), atualizadoEm: Date.now() };
       if (st.tipo === 'gasto' || st.tipo === 'entrada') { rec.cat = st.cat || ''; if (st.tipo === 'gasto' && st.origem) rec.origem = st.origem; }
+      else if (st.tipo === 'transferir') {
+        if (!st.caixinha || !st.para) { toast('Precisa de duas caixinhas para transferir.'); return; }
+        if (st.caixinha === st.para) { toast('Escolha caixinhas diferentes.'); return; }
+        rec.caixinha = st.caixinha; rec.para = st.para;
+      }
       else { if (!st.caixinha) { toast('Crie uma caixinha primeiro.'); return; } rec.caixinha = st.caixinha; }
       if (st.rec) rec.rec = st.rec;
       if (st.pj) rec.pj = st.pj;
@@ -1407,15 +1541,22 @@ button { cursor: pointer; }
       if (edit && ymOf(l.data) !== ymOf(rec.data)) await tirarLanc(l);
       mes = ymOf(rec.data);
       await porLanc(rec);
-      toast((edit ? 'Salvo.' : 'Plin! Anotado.') + avisoCx(rec, edit ? l : null) + avisoTeto(rec));
+      toast((rec.tipo === 'transferir' && !edit ? 'Transferido.' : edit ? 'Salvo.' : 'Plin! Anotado.') + avisoCx(rec, edit ? l : null) + avisoTeto(rec));
     }
     save.addEventListener('click', go);
+  }
+
+  function abrirTransf(de) {
+    if (cfg.caixinhas.length < 2) { toast('Precisa de pelo menos duas caixinhas.'); return; }
+    openLanc({ tipo: 'transferir', caixinha: de || '', para: '', data: todayISO(), valor: 0, desc: '', novo: true });
   }
 
   function openCx(id) {
     if (bloqueado()) return;
     const cx = id ? cxById(id) : null;
-    const atual = cx ? saldoCx(cx) : 0;
+    const atual = cx ? saldoEst(cx) : 0;
+    const rendAgora = cx ? rendCx(cx) : 0;
+    const r0 = cx ? rendeDe(cx) : { tipo: 'cdi', taxa: 100 };
     const nome = h('input', { type: 'text', id: 'cx-nome', value: cx ? cx.nome : '', placeholder: 'Ex.: Viagem de férias' });
     const banco = h('input', { type: 'text', id: 'cx-banco', value: cx ? cx.banco || '' : '', placeholder: 'Ex.: nome do banco' });
     const grupo = h('select', { id: 'cx-grupo' }, Object.entries(GRUPOS).map(([k, g]) => h('option', { value: k }, g.nome))); grupo.value = cx ? cx.grupo : 'investimentos';
@@ -1426,24 +1567,29 @@ button { cursor: pointer; }
     const paintSoma = () => somaBox.replaceChildren(...cfg.caixinhas.filter((c) => !cx || c.id !== cx.id).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(soma.includes(c.id)), onclick: () => { soma = soma.includes(c.id) ? soma.filter((x) => x !== c.id) : [...soma, c.id]; paintSoma(); } }, c.nome)));
     paintSoma();
     const rende = h('input', { type: 'text', id: 'cx-rende', value: cx ? cx.rende || '' : '', placeholder: 'Ex.: 100% CDI' });
+    const rTipo = h('select', { id: 'cx-rtipo' }, h('option', { value: 'cdi' }, '% do CDI'), h('option', { value: 'pre' }, '% ao ano (fixo)'), h('option', { value: 'nao' }, 'Não rende')); rTipo.value = r0.tipo;
+    const rTaxa = h('input', { type: 'text', inputmode: 'decimal', id: 'cx-rtaxa', value: r0.taxa ? n2.format(r0.taxa).replace(/,00$/, '') : '', placeholder: 'Ex.: 115' });
+    const rTaxaF = field('Taxa', rTaxa);
+    const pintaR = () => { rTaxaF.hidden = rTipo.value === 'nao'; }; rTipo.addEventListener('change', pintaR); pintaR();
     const resgate = h('input', { type: 'text', id: 'cx-resgate', value: cx ? cx.resgate || '' : '', placeholder: 'Ex.: diária, no vencimento' });
     const nota = h('input', { type: 'text', id: 'cx-nota', value: cx ? cx.nota || '' : '', placeholder: 'Para que serve' });
     const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, cx ? 'Salvar' : 'Criar caixinha');
-    const usada = cx && all().some((l) => l.caixinha === cx.id || l.origem === cx.id);
+    const usada = cx && all().some((l) => l.caixinha === cx.id || l.origem === cx.id || l.para === cx.id);
     // o que mexeu no saldo desde o último saldo informado (gastos que saíram dela descontam sozinhos)
     const movs = cx ? all().filter((l) => contaNoSaldo(l, cx)).sort((a, b) => b.data.localeCompare(a.data) || (b.criadoEm || 0) - (a.criadoEm || 0)) : [];
     const movRow = (l) => {
-      const sai = l.tipo !== 'guardar';
-      const nm = l.desc || (l.tipo === 'gasto' ? catById('gasto', l.cat).nome : l.tipo === 'guardar' ? 'Guardou' : 'Resgatou');
+      const sai = movCx(l, cx.id) < 0;
+      const nm = l.desc || (l.tipo === 'gasto' ? catById('gasto', l.cat).nome : l.tipo === 'guardar' ? 'Guardou' : l.tipo === 'transferir' ? (sai ? 'Transferiu para ' + nomeCx(l.para) : 'Veio de ' + nomeCx(l.caixinha)) : 'Resgatou');
       return h('button', { class: 'en', type: 'button', onclick: () => { sh.close(); openLanc(l); } }, h('span', { class: 't' }, nm), h('span', { class: 'v' + (sai ? '' : ' pos') }, (sai ? '− ' : '+ ') + brl(l.valor)), h('span', { class: 'meta' }, l.data.split('-').reverse().slice(0, 2).join('/') + ' · ' + (l.tipo === 'gasto' ? 'gasto' : l.tipo)));
     };
     const movBox = movs.length ? h('div', { class: 'field' }, h('span', null, 'Mexeu no saldo desde a última atualização'), h('div', null, movs.slice(0, 8).map(movRow)), movs.length > 8 ? h('p', { class: 'sub' }, `e mais ${movs.length - 8}.`) : null) : null;
     const body = h('div', { class: 'stack', style: 'gap:12px' },
       field('Nome', nome), h('div', { class: 'two' }, field('Banco', banco), field('Grupo', grupo)),
-      field(cx ? 'Saldo de hoje (atualize com o rendimento do banco)' : 'Saldo de hoje', saldo),
-      cx ? h('p', { class: 'sub', style: 'margin-top:-6px' }, 'Gastos que saem desta caixinha, guardar e resgatar já mudam o saldo sozinhos. Só mexa aqui para acertar com o banco (rendimento).') : null,
+      field('Saldo de hoje', saldo),
+      cx ? h('p', { class: 'sub', style: 'margin-top:-6px' }, (rendAgora ? `Já conta +${brl(rendAgora)} de rendimento aprox. desde ${dmCurto(inicioRend(cx))}. ` : '') + 'Gastos, guardar, resgatar e transferências já mudam o saldo sozinhos. Para corrigir, troque pelo saldo que aparece no banco: a conta recomeça dali.') : null,
       movBox,
-      h('div', { class: 'two' }, field('Meta', meta), field('Rende', rende)),
+      h('div', { class: 'two' }, field('Rendimento automático', rTipo), rTaxaF),
+      h('div', { class: 'two' }, field('Meta', meta), field('Rende (texto)', rende)),
       h('div', { class: 'field' }, h('span', null, 'Somar na meta o saldo de (opcional)'), somaBox),
       field('Resgate', resgate), field('Para que serve', nota),
       h('div', { class: 'row-btns' }, save, cx && !usada ? dangerBtn('Excluir', async () => { cfg.caixinhas = cfg.caixinhas.filter((c) => c.id !== cx.id); sh.close(); render(); await salvarCfg(); toast('Caixinha excluída.'); }) : null),
@@ -1456,10 +1602,14 @@ button { cursor: pointer; }
       const m = meta.value.trim() ? parseCent(meta.value) : null;
       const rec = { id: cx ? cx.id : uid(), nome: nome.value.trim(), banco: banco.value.trim(), grupo: grupo.value, meta: m && m > 0 ? m : null, rende: rende.value.trim(), resgate: resgate.value.trim(), nota: nota.value.trim(), saldoBase: cx ? cx.saldoBase : s, baseEm: cx ? cx.baseEm : Date.now() };
       if (rec.meta && soma.length) rec.somaCom = soma.filter((id) => cxById(id));
-      if (cx && s !== atual) { rec.saldoBase = s; rec.baseEm = Date.now(); }
+      const tx = Number(String(rTaxa.value).replace(/\s|%/g, '').replace(',', '.'));
+      if (rTipo.value !== 'nao' && !(tx > 0 && tx < 1000)) { toast('Taxa inválida.'); return; }
+      rec.rendeAuto = { tipo: rTipo.value, taxa: rTipo.value === 'nao' ? 0 : Math.round(tx * 100) / 100 };
+      rec.rendeDesde = cx && cx.rendeDesde ? cx.rendeDesde : todayISO();
+      if (cx && s !== atual) { rec.saldoBase = s; rec.baseEm = Date.now(); rec.rendeDesde = todayISO(); }
       cfg.caixinhas = cx ? cfg.caixinhas.map((c) => (c.id === cx.id ? rec : c)) : [...cfg.caixinhas, rec];
       sh.close(); render(); await salvarCfg();
-      toast(cx && s !== atual ? `Saldo atualizado (${s > atual ? '+' : '−'} ${brl(Math.abs(s - atual))}).` : 'Salvo.');
+      toast(cx && s !== atual ? (rendAgora ? `Saldo corrigido. O estimado estava ${brl(Math.abs(s - atual))} ${s > atual ? 'abaixo' : 'acima'} do banco.` : `Saldo atualizado (${s > atual ? '+' : '−'} ${brl(Math.abs(s - atual))}).`) : 'Salvo.');
     });
   }
 
@@ -1705,7 +1855,8 @@ button { cursor: pointer; }
     for (const l of all().sort((a, b) => a.data.localeCompare(b.data))) {
       const cat = l.tipo === 'gasto' || l.tipo === 'entrada' ? catById(l.tipo, l.cat).nome : '';
       const cx = cxById(l.caixinha || l.origem);
-      linhas.push([l.data.split('-').reverse().join('/'), cap(l.tipo), centStr(l.valor).replace(/\./g, ''), q(cat), q(l.desc), q(cx ? cx.nome : '')].join(';'));
+      const cxNome = l.tipo === 'transferir' ? `${nomeCx(l.caixinha)} → ${nomeCx(l.para)}` : cx ? cx.nome : '';
+      linhas.push([l.data.split('-').reverse().join('/'), cap(l.tipo), centStr(l.valor).replace(/\./g, ''), q(cat), q(l.desc), q(cxNome)].join(';'));
     }
     return '﻿' + linhas.join('\r\n');
   }
@@ -1721,6 +1872,8 @@ button { cursor: pointer; }
   showTab();
   $('anotar').addEventListener('click', () => openLanc());
   $('cx-new').addEventListener('click', () => openCx());
+  $('cx-transf').addEventListener('click', () => abrirTransf());
+  $('cx-rend').addEventListener('click', () => openCdi());
   $('pj-new').addEventListener('click', () => openPlanejado());
   $('lb-new').addEventListener('click', () => openLembrete());
   $('rc-new').addEventListener('click', () => openRec());
