@@ -1,6 +1,6 @@
 // Plin: guarda o app no aparelho para abrir sem internet.
 // Mude VERSAO quando publicar uma versão nova, para o navegador trocar o cache.
-const VERSAO = 'plin-2.11.1';
+const VERSAO = 'plin-2.13.1';
 const APP = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-v2-192.png', 'icon-v2-512.png', 'icon-v2-maskable-512.png'];
 
 self.addEventListener('install', (e) => {
