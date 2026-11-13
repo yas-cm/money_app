@@ -170,6 +170,15 @@ button { cursor: pointer; }
 .hoje > div:first-child { background: var(--mint-soft); border-color: transparent; }
 .big2 { font-family: var(--display); font-weight: 700; font-size: 1.25rem; }
 .hoje small { color: var(--muted); font-size: .74rem; }
+button.hj { font: inherit; color: inherit; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 1px; min-width: 0; }
+#ledger > div, .dia-tot, #gr-kpis .kpi:last-child, #livre-resta, #jar { cursor: pointer; }
+.mark { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.mark small { cursor: pointer; }
+.mark img { -webkit-user-drag: none; user-drag: none; }
+.novid { display: grid; grid-template-columns: 3.4rem 1fr; gap: 10px; font-size: .88rem; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.novid:last-child { border-bottom: 0; }
+.novid b { font-variant-numeric: tabular-nums; color: var(--muted); }
+.novid.atual b { color: var(--ink); }
 button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; background: var(--mint-soft); border: 1px solid transparent; border-radius: 14px; padding: 10px 12px; display: grid; gap: 1px; min-width: 0; }
 .conta .ledger { margin-top: 0; }
 .conta .ledger div.sub2 { font-size: .8rem; color: var(--muted); padding-left: 14px; }
@@ -258,7 +267,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <div class="app">
   <header class="top">
     <div class="mark">
-      <img src="icon.svg" alt="" width="34" height="34" style="border-radius:9px">
+      <img src="icon.svg" alt="" draggable="false" width="34" height="34" style="border-radius:9px">
       plin <small id="versao">1.1</small>
     </div>
     <div class="top-r">
@@ -439,7 +448,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.15.1';
+  const VERSAO = '2.16.1';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -490,10 +499,10 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   }
   const NS = 'http://www.w3.org/2000/svg';
   function sv(tag, attrs, text) { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); if (text != null) el.textContent = text; return el; }
-  function toast(msg, acao) {
+  function toast(msg, acao, ms) {
     const t = $('toast'); t.replaceChildren(h('span', null, msg));
     if (acao) t.append(h('button', { type: 'button', onclick: () => { t.hidden = true; acao.fn(); } }, acao.label));
-    t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, acao ? 6000 : 2400);
+    t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, ms || (acao ? 6000 : 2400));
   }
 
   const PALETA = ['#f2662e', '#17a387', '#5b6cf0', '#e2a623', '#c2459a', '#2f8fd8', '#8a5cd6', '#e0514f', '#4fae4a', '#d97a1e', '#2bb5c8', '#9c7b55', '#6b7891', '#d4588a', '#7a9e2f', '#3c5bd1'];
@@ -790,6 +799,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     if (!carregou) return;
     const d = doMes(mes);
     const o = orcamento(mes, d);
+    ultMes = { d, o };
     const meta = o.meta;
     const futuro = mes > ymOf(todayISO());
     // sem dinheiro do mês ainda não dá pra falar em Livre: mostra só o que foi gasto, com o rótulo certo
@@ -818,7 +828,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       const conta = { meta, o, gastouAntes: d.gastou - gHoje, livreDepois, dias, porDia, ultimo, hoje, gHoje };
       hojeEl.replaceChildren(
         h('button', { class: 'pdia', type: 'button', onclick: () => openContaDia(conta), 'aria-label': 'Ver a conta do pode gastar por dia' }, h('span', { class: 'label' }, 'Pode gastar por dia'), h('b', { class: 'big2 num' + (porDia < 0 ? ' neg' : '') }, porDia > 0 ? brl(porDia) : (oculto ? MASCARA : 'R$ 0')), h('small', null, `até dia ${ultimo}` + (o.pendente ? `, já guardando ${brl(o.pendente)} pros planejados e fixos` : ''))),
-        h('div', null, h('span', { class: 'label' }, 'Hoje'), h('b', { class: 'big2 num' + (porDia > 0 && gHoje > porDia ? ' neg' : '') }, brl(gHoje)), h('small', null, gHoje === 0 ? 'nada ainda' : porDia > 0 && gHoje > porDia ? `passou ${brl(gHoje - porDia)}` : `sobra ${brl(Math.max(0, porDia - gHoje))}`)));
+        h('button', { class: 'hj', type: 'button', onclick: () => openHoje(conta) }, h('span', { class: 'label' }, 'Hoje'), h('b', { class: 'big2 num' + (porDia > 0 && gHoje > porDia ? ' neg' : '') }, brl(gHoje)), h('small', null, gHoje === 0 ? 'nada ainda' : porDia > 0 && gHoje > porDia ? `passou ${brl(gHoje - porDia)}` : `sobra ${brl(Math.max(0, porDia - gHoje))}`)));
     } else hojeEl.hidden = true;
     renderMesResto(d);
   }
@@ -1028,7 +1038,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       const dt = new Date(dia + 'T00:00:00Z');
       const gDia = ls.filter((l) => l.tipo === 'gasto').reduce((a, l) => a + l.valor, 0);
       box.append(h('div', { class: 'dia' }, h('div', { class: 'd' }, h('b', null, String(dt.getUTCDate())), h('small', null, wdF.format(dt).replace('.', ''))),
-        h('div', { class: 'es' }, ls.map(entryEl), gDia ? h('div', { class: 'dia-tot' }, h('span', null, 'Gastou no dia'), h('b', null, '− ' + brl(gDia))) : null)));
+        h('div', { class: 'es' }, ls.map(entryEl), gDia ? h('div', { class: 'dia-tot', onclick: () => toastDia(dia, gDia) }, h('span', null, 'Gastou no dia'), h('b', null, '− ' + brl(gDia))) : null)));
     }
   }
   function entryEl(l) {
@@ -1081,7 +1091,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
             h('span', { class: 'gauge' }, h('i', { style: `height:${p * 100}%;background:${GRUPOS[k].cor}` })),
             h('span', { class: 'nm' }, c.nome), h('span', { class: 'sv' }, brl(c.atual)),
             c.rend ? h('span', { class: 'sub aprox' }, `+${brl(c.rend)} aprox. desde ${dmCurto(inicioRend(c))}`) : null,
-            c.meta ? h('span', { class: 'sub' }, `${Math.floor(naMeta / c.meta * 100)}% de ${brl(c.meta)}` + (junto.length ? ` (${brl(naMeta)} com ${junto.map((x) => x.nome).join(' e ')})` : '') + (naMeta >= c.meta ? ' · meta batida!' : ` · faltam ${brl(c.meta - naMeta)}`)) : null,
+            c.meta ? h('span', { class: 'sub', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, `${Math.floor(naMeta / c.meta * 100)}% de ${brl(c.meta)}` + (junto.length ? ` (${brl(naMeta)} com ${junto.map((x) => x.nome).join(' e ')})` : '') + (naMeta >= c.meta ? ' · meta batida!' : ` · faltam ${brl(c.meta - naMeta)}`)) : null,
             dono ? h('span', { class: 'sub' }, 'Conta na meta de ' + dono.nome) : null,
             h('span', { class: 'sub' }, [c.banco, c.rende || (rendeDe(c).tipo !== 'nao' ? rendeTxt(rendeDe(c)) : ''), c.resgate ? 'resgate ' + c.resgate : ''].filter(Boolean).join(' · ')),
             c.nota ? h('span', { class: 'sub' }, c.nota) : null);
@@ -1237,7 +1247,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       h('div', { class: 'kpi' }, h('span', null, ms.length === 1 ? 'Gasto no mês' : 'Gasto no período'), h('b', null, brl(tot))),
       ms.length === 1 ? h('div', { class: 'kpi' }, h('span', null, ms[0] === ymOf(todayISO()) ? 'Média por dia até hoje' : 'Média por dia'), h('b', null, brl(Math.round(tot / (ms[0] === ymOf(todayISO()) ? Number(todayISO().slice(8, 10)) : new Date(Date.UTC(+ms[0].slice(0, 4), +ms[0].slice(5, 7), 0)).getUTCDate())))))
         : h('div', { class: 'kpi' }, h('span', null, 'Média por mês'), h('b', null, brl(Math.round(tot / comGasto)))),
-      h('div', { class: 'kpi' }, h('span', null, 'Maior categoria'), h('b', { style: 'font-size:.95rem' }, maior ? maior.nome : '—')));
+      h('div', { class: 'kpi', onclick: toastMaiorCat }, h('span', null, 'Maior categoria'), h('b', { style: 'font-size:.95rem' }, maior ? maior.nome : '—')));
 
     // ranking por categoria (barras horizontais, mesma escala)
     $('gr-cat-sub').textContent = nomePer(ms);
@@ -1332,13 +1342,275 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     box.replaceChildren(svg, leg);
   }
 
+  // ---------- informações escondidas (sem dica na tela: é só tocar) ----------
+  const diasNoMes = (ym) => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate();
+  const diasPassados = (ym) => { const h0 = todayISO(); return ym === ymOf(h0) ? Number(h0.slice(8, 10)) : ym < ymOf(h0) ? diasNoMes(ym) : 0; };
+  const dataBr = (iso) => iso.split('-').reverse().join('/');
+  const n1 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+  const pct = (a, b) => b ? Math.round((a - b) / b * 100) : null;
+  const linhaE = (t, v, sinal, cls) => h('div', { class: cls || '' }, h('span', null, (sinal ? sinal + ' ' : '') + t), h('span', { class: 'lead' }), h('b', { class: 'num' + (v < 0 ? ' neg' : '') }, typeof v === 'string' ? v : v < 0 ? '− ' + brl(-v) : brl(v)));
+  const subE = (t, v) => h('div', { class: 'sub2' }, h('span', null, t), h('span', { class: 'lead' }), h('span', { class: 'num' }, typeof v === 'string' ? v : brl(v)));
+  let ultMes = null; // { d, o } do mês na tela, para os toques do pote
+
+  // 1. pote do Livre: quanto sobra no fim do mês se continuar nesse ritmo
+  function openRitmo() {
+    if (!ultMes || !carregou) return;
+    const { d, o } = ultMes; const meta = o.meta;
+    const passou = diasPassados(mes), ultimo = diasNoMes(mes);
+    if (!passou) { toast('Esse mês ainda não começou.'); return; }
+    const pjs = d.ls.filter((l) => l.tipo === 'gasto' && !l.origem && l.pj).reduce((a, l) => a + l.valor, 0);
+    const normal = d.gastou - pjs;
+    const porDia = Math.round(normal / passou);
+    const linhas = [];
+    if (passou < ultimo) {
+      const faltam = ultimo - passou;
+      const resto = porDia * faltam;
+      const prev = d.gastou + resto + o.pendente;
+      const sobra = meta - prev;
+      linhas.push(h('div', { class: 'ledger' },
+        meta > 0 ? linhaE('Livre do mês', meta) : null,
+        linhaE(`Gastou até hoje (dia ${passou})`, d.gastou),
+        pjs ? subE('desses, planejados já pagos', pjs) : null,
+        subE('o normal dá por dia', porDia),
+        linhaE(`Nesse ritmo, mais ${faltam} ${faltam === 1 ? 'dia' : 'dias'}`, resto, '+'),
+        o.pendente ? linhaE('Planejados e fixos ainda não pagos', o.pendente, '+') : null,
+        linhaE('Previsão de gastos do mês', prev, '=', 'res'),
+        meta > 0 ? linhaE(sobra >= 0 ? 'Sobra no fim do mês' : 'Passa do Livre', Math.abs(sobra), sobra >= 0 ? '=' : '−', 'res') : null));
+      linhas.push(h('p', { class: 'sub' }, meta > 0 ? (sobra >= 0 ? `Se continuar assim, o mês fecha com ${brl(sobra)} sobrando no Livre.` : `Se continuar assim, passa ${brl(-sobra)} do Livre. Gastando até ${brl(Math.max(0, Math.floor((meta - d.gastou - o.pendente) / faltam)))} por dia daqui pra frente, fecha no zero.`) : 'Ainda não tem Livre definido neste mês, então é só a previsão de gastos.'));
+    } else {
+      linhas.push(h('div', { class: 'ledger' },
+        meta > 0 ? linhaE('Livre do mês', meta) : null,
+        linhaE('Gastou', d.gastou),
+        subE('média por dia', Math.round(d.gastou / ultimo)),
+        meta > 0 ? linhaE(meta - d.gastou >= 0 ? 'Sobrou' : 'Passou', Math.abs(meta - d.gastou), '=', 'res') : null));
+      const ant = doMes(addMonths(mes, -1)).gastou, p = pct(d.gastou, ant);
+      if (ant && p !== null) linhas.push(h('p', { class: 'sub' }, `Comparado com ${mLong(addMonths(mes, -1)).toLowerCase()}: ${p === 0 ? 'gastou o mesmo' : Math.abs(p) + '% ' + (p > 0 ? 'a mais' : 'a menos')}.`));
+    }
+    sheet(passou < ultimo ? 'Como o mês vai fechar' : 'Como o mês fechou', h('div', { class: 'stack conta', style: 'gap:14px' }, linhas));
+  }
+
+  // 2. Entrou / Gastou / Guardou: o detalhe de cada linha
+  function openDetalhe(k) {
+    if (!carregou) return;
+    const d = doMes(mes); const ls = d.ls;
+    let titulo, corpo;
+    if (k === 'entrou') {
+      const es = ls.filter((l) => l.tipo === 'entrada').sort((a, b) => a.data.localeCompare(b.data));
+      titulo = 'O que entrou';
+      corpo = es.length ? [h('div', { class: 'ledger' }, es.map((l) => linhaE(`${dmCurto(l.data)} · ${l.desc || catById('entrada', l.cat).nome}`, l.valor)), linhaE('Total', d.entrou, '=', 'res'))] : [h('p', { class: 'sub' }, 'Nada entrou neste mês ainda.')];
+    } else if (k === 'gastou') {
+      const by = new Map(); for (const l of ls) if (l.tipo === 'gasto' && !l.origem) by.set(l.cat, (by.get(l.cat) || 0) + l.valor);
+      const byCx = new Map(); for (const l of ls) if (l.tipo === 'gasto' && l.origem) byCx.set(l.origem, (byCx.get(l.origem) || 0) + l.valor);
+      const tot = d.gastou + d.gastoCx;
+      titulo = 'Pra onde foi';
+      corpo = tot ? [h('div', { class: 'ledger' },
+        [...by.entries()].sort((a, b) => b[1] - a[1]).map(([id, v]) => linhaE(`${catById('gasto', id).nome} (${Math.round(v / tot * 100)}%)`, v)),
+        d.gastoCx ? linhaE('Saiu de caixinhas', d.gastoCx) : null,
+        [...byCx.entries()].map(([id, v]) => subE(nomeCx(id), v)),
+        linhaE('Total', tot, '=', 'res')),
+      h('p', { class: 'sub' }, d.gastoCx ? 'Só os gastos do Livre descontam do pote; os que saíram de caixinha descontam da caixinha.' : `Média de ${brl(Math.round(tot / Math.max(1, diasPassados(mes) || diasNoMes(mes))))} por dia.`)] : [h('p', { class: 'sub' }, 'Nenhum gasto neste mês ainda.')];
+    } else {
+      const by = new Map();
+      for (const l of ls) if (l.tipo === 'guardar' || l.tipo === 'resgatar') { const x = by.get(l.caixinha) || { g: 0, r: 0 }; x[l.tipo === 'guardar' ? 'g' : 'r'] += l.valor; by.set(l.caixinha, x); }
+      const tr = ls.filter((l) => l.tipo === 'transferir');
+      titulo = 'Pra onde foi guardado';
+      corpo = by.size || tr.length ? [h('div', { class: 'ledger' },
+        [...by.entries()].sort((a, b) => (b[1].g - b[1].r) - (a[1].g - a[1].r)).map(([id, x]) => [linhaE(nomeCx(id), x.g - x.r), x.g && x.r ? subE(`guardou ${brl(x.g)}, resgatou`, x.r) : null]),
+        by.size ? linhaE('Total', d.guardou, '=', 'res') : null),
+      tr.length ? h('p', { class: 'sub' }, `${tr.length} ${tr.length === 1 ? 'transferência' : 'transferências'} entre caixinhas (${brl(tr.reduce((a, l) => a + l.valor, 0))}) não ${tr.length === 1 ? 'entra' : 'entram'} nessa conta.`) : null] : [h('p', { class: 'sub' }, 'Nada guardado neste mês ainda.')];
+    }
+    sheet(titulo + ' em ' + mLong(mes).toLowerCase(), h('div', { class: 'stack conta', style: 'gap:14px' }, corpo));
+  }
+
+  // dia médio: gastos do Livre (sem planejados) nos 90 dias antes de hoje
+  function diaMedio() {
+    const hoje = todayISO(), ini = addDia(hoje, -90);
+    let s = 0;
+    for (const l of all()) if (l.tipo === 'gasto' && !l.origem && !l.pj && l.data >= ini && l.data < hoje) s += l.valor;
+    return Math.round(s / 90);
+  }
+  // 3. quadro "Hoje": o que foi gasto hoje e como está perto de um dia normal
+  function openHoje(c) {
+    const ls = ultMes.d.ls.filter((l) => l.tipo === 'gasto' && l.data === c.hoje);
+    const med = diaMedio(); const p = pct(c.gHoje, med);
+    const semGasto = []; for (let i = 1; i < Number(c.hoje.slice(8, 10)); i++) { const iso = mes + '-' + String(i).padStart(2, '0'); if (!ultMes.d.ls.some((l) => l.tipo === 'gasto' && !l.origem && l.data === iso)) semGasto.push(iso); }
+    const body = h('div', { class: 'stack conta', style: 'gap:14px' },
+      ls.length ? h('div', { class: 'stack', style: 'gap:6px' }, ls.map(entryEl)) : h('p', { class: 'sub' }, 'Nada gasto hoje. Dia limpo até agora!'),
+      h('div', { class: 'ledger' },
+        linhaE('Hoje', c.gHoje),
+        linhaE('Seu dia normal', med),
+        h('div', { class: 'sub2' }, h('span', null, 'média dos últimos 90 dias, sem planejados'))),
+      h('p', { class: 'sub' }, !c.gHoje ? (med ? `Um dia normal seu é ${brl(med)}.` : '') : p === null ? '' : p === 0 ? 'Bem na média de um dia normal.' : `Hoje está ${Math.abs(p)}% ${p > 0 ? 'acima' : 'abaixo'} de um dia normal.`),
+      semGasto.length ? h('p', { class: 'sub' }, `Neste mês você passou ${semGasto.length} ${semGasto.length === 1 ? 'dia' : 'dias'} sem gastar nada do Livre.`) : null);
+    sheet('Hoje', body);
+  }
+
+  // 4. "Gastou no dia" no extrato: como o dia ficou perto do resto do mês
+  function toastDia(dia, gDia) {
+    const tot = new Map();
+    for (const l of meses[mes] || []) if (l.tipo === 'gasto') tot.set(l.data, (tot.get(l.data) || 0) + l.valor);
+    const vs = [...tot.values()], soma = vs.reduce((a, v) => a + v, 0);
+    const media = Math.round(soma / Math.max(1, diasPassados(mes) || diasNoMes(mes)));
+    const ord = [...tot.entries()].sort((a, b) => b[1] - a[1]);
+    const pos = ord.findIndex(([d0]) => d0 === dia) + 1;
+    let t;
+    if (ord.length > 1 && pos === 1) t = `O dia que você mais gastou em ${mLong(mes).toLowerCase().split(' ')[0]}.`;
+    else if (ord.length > 2 && pos === ord.length) t = 'O dia com o menor gasto do mês.';
+    else if (pos > 1 && pos <= 3 && ord.length > 4) t = `O ${pos}º dia que mais gastou no mês.`;
+    else t = '';
+    const p = pct(gDia, media);
+    t += (t ? ' ' : '') + (p === null ? '' : p === 0 ? `Bem na média do mês (${brl(media)} por dia).` : p >= 100 ? `${n1.format(gDia / media)} vezes a média do mês, que é ${brl(media)} por dia.` : `${Math.abs(p)}% ${p > 0 ? 'acima' : 'abaixo'} da média do mês, que é ${brl(media)} por dia.`);
+    toast(t, null, 5000);
+  }
+
+  // aportes que o plano manda fazer num mês
+  function aportesDe(ym) {
+    const pl = planoDe(ym);
+    if (pl === 'mes') return (cfg.planosMes[ym].aportes || []).map((a) => ({ cx: a.cx, valor: a.valor || 0 }));
+    if (pl === 'transicao') return (cfg.transicao.aportes || []).map((a) => ({ cx: a.cx, valor: a.min || 0 }));
+    return (cfg.aportesFixos || []).map((a) => ({ cx: a.cx, valor: a.valor || 0 }));
+  }
+  const taxaMes = (cx) => { const r = rendeDe(cx); const aa = r.tipo === 'cdi' ? cdiAtual() * r.taxa / 100 : r.tipo === 'pre' ? r.taxa : 0; return aa > 0 ? Math.pow(1 + aa / 100, 1 / 12) - 1 : 0; };
+  // 5. caixinha com meta: em que mês a meta chega, seguindo o plano
+  function openMetaCx(c) {
+    const ids = [c.id, ...(c.somaCom || [])];
+    const cxs = ids.map(cxById).filter(Boolean);
+    const sal = cxs.map((x) => Math.max(0, saldoCx(x) + rendCx(x)));
+    const tem = sal.reduce((a, v) => a + v, 0);
+    const body = h('div', { class: 'stack conta', style: 'gap:14px' });
+    if (tem >= c.meta) {
+      body.append(h('div', { class: 'ledger' }, linhaE('Meta', c.meta), linhaE('Tem hoje', tem), linhaE('Passou da meta', tem - c.meta, '=', 'res')), h('p', { class: 'sub' }, 'Meta batida! Tudo que entrar agora é extra.'));
+      sheet(c.nome, body); return;
+    }
+    const agora = ymOf(todayISO());
+    const simula = (comRend) => {
+      const s = [...sal];
+      for (let k = 0; k <= 240; k++) {
+        const ym = addMonths(agora, k);
+        cxs.forEach((x, i) => {
+          for (const a of aportesDe(ym)) if (a.cx === x.id) s[i] += k === 0 ? Math.max(0, a.valor - guardadoEm(ym, x.id)) : a.valor;
+          if (comRend && k > 0) s[i] += s[i] * taxaMes(x);
+        });
+        if (s.reduce((a, v) => a + v, 0) >= c.meta) return ym;
+      }
+      return null;
+    };
+    const com = simula(true), sem = simula(false);
+    const prox = addMonths(agora, 1);
+    const porMes = aportesDe(prox).filter((a) => ids.includes(a.cx)).reduce((a, x) => a + x.valor, 0);
+    const rendM = Math.round(cxs.reduce((a, x, i) => a + sal[i] * taxaMes(x), 0));
+    body.append(h('div', { class: 'ledger' },
+      linhaE('Meta', c.meta),
+      linhaE('Tem hoje', tem, '−'),
+      cxs.length > 1 ? cxs.map((x, i) => subE(x.nome, sal[i])) : null,
+      linhaE('Falta', c.meta - tem, '=', 'res'),
+      linhaE(`Plano guarda em ${mShort(prox)}`, porMes),
+      rendM ? linhaE('Rende por mês (aprox.)', rendM) : null,
+      linhaE('Chega lá em', com ? mLong(com) : 'não chega', null, 'res')));
+    body.append(h('p', { class: 'sub' }, !com ? 'O plano não guarda nada nessa caixinha, então no ritmo atual a meta não chega. Dá pra mudar isso no Plano.' :
+      `Seguindo o plano${rendM ? ' e com o rendimento aproximado' : ''}, a meta chega em ${mLong(com).toLowerCase()}.` + (rendM && sem && sem !== com ? ` Só com os aportes, sem rendimento, seria em ${mLong(sem).toLowerCase()}.` : '')));
+    sheet(c.nome, body);
+  }
+
+  // 6. "Maior categoria" nos gráficos: comparação com o período anterior
+  function toastMaiorCat() {
+    const ms = mesesDoPeriodo();
+    const by = new Map(); for (const l of gastosDe(ms)) by.set(l.cat, (by.get(l.cat) || 0) + l.valor);
+    const top = [...by.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (!top) return;
+    const c = catById('gasto', top[0]), v = top[1];
+    if (per === 0) { const tot = [...by.values()].reduce((a, x) => a + x, 0); toast(`${c.nome} leva ${Math.round(v / tot * 100)}% de tudo que você já gastou: ${brl(v)} desde ${mShort(ms[0])}/${ms[0].slice(2, 4)}.`, null, 6000); return; }
+    const n = ms.length, hoje = todayISO(), parcial = ms[n - 1] === ymOf(hoje);
+    const ant = ms.map((m) => addMonths(m, -n));
+    const corte = (m, l) => !parcial || m !== ant[n - 1] || Number(l.data.slice(8, 10)) <= Number(hoje.slice(8, 10));
+    const va = ant.reduce((a, m) => a + (meses[m] || []).filter((l) => l.tipo === 'gasto' && l.cat === top[0] && corte(m, l)).reduce((s, l) => s + l.valor, 0), 0);
+    const nomeAnt = n === 1 ? (parcial ? `até dia ${Number(hoje.slice(8, 10))} de ${mShort(ant[0])}` : `em ${mShort(ant[0])}`) : `nos ${n} meses antes`;
+    const p = pct(v, va);
+    toast(!va ? `${c.nome}: ${brl(v)}. ${cap(nomeAnt)} foi zero.` : `${c.nome}: ${brl(v)}, contra ${brl(va)} ${nomeAnt}` + (p === 0 ? ', o mesmo.' : ` (${Math.abs(p)}% ${p > 0 ? 'a mais' : 'a menos'}).`), null, 6000);
+  }
+
+  // 7. segurar o logo: curiosidades de todo o histórico
+  function openCurio() {
+    if (!carregou) return;
+    const ls = all(), gs = ls.filter((l) => l.tipo === 'gasto');
+    const body = h('div', { class: 'stack conta', style: 'gap:14px' });
+    if (!gs.length) { body.append(h('p', { class: 'sub' }, 'Anote uns gastos primeiro que eu conto umas curiosidades.')); sheet('Curiosidades', body); return; }
+    const datas = ls.map((l) => l.data).sort(); const ini = datas[0];
+    const fatos = [];
+    fatos.push(['Lançamentos anotados', `${ls.length}`, `desde ${dataBr(ini)}`]);
+    const tcg = catsOf('gasto').find((c) => c.id === 'tcg');
+    if (tcg) { const t = gs.filter((l) => l.cat === 'tcg'); if (t.length) fatos.push(['Já foi em TCG', brl(t.reduce((a, l) => a + l.valor, 0)), `em ${t.length} compras`]); }
+    const maior = [...gs].sort((a, b) => b.valor - a.valor)[0];
+    fatos.push(['Maior gasto de todos', brl(maior.valor), `${maior.desc || catById('gasto', maior.cat).nome}, ${dataBr(maior.data)}`]);
+    const agora = ymOf(todayISO());
+    const porMes = new Map(); for (const l of gs) { const m = ymOf(l.data); porMes.set(m, (porMes.get(m) || 0) + l.valor); }
+    const fechados = [...porMes.entries()].filter(([m]) => m < agora && m > ymOf(ini)).sort((a, b) => a[1] - b[1]);
+    if (fechados.length > 1) {
+      fatos.push(['Mês mais barato', brl(fechados[0][1]), mLong(fechados[0][0]).toLowerCase()]);
+      const caro = fechados[fechados.length - 1]; fatos.push(['Mês mais caro', brl(caro[1]), mLong(caro[0]).toLowerCase()]);
+    }
+    const porCat = new Map(); for (const l of gs) porCat.set(l.cat, (porCat.get(l.cat) || 0) + l.valor);
+    const campea = [...porCat.entries()].sort((a, b) => b[1] - a[1])[0];
+    fatos.push(['Categoria campeã', catById('gasto', campea[0]).nome, `${brl(campea[1])} no total`]);
+    const wd = new Array(7).fill(0); for (const l of gs) wd[new Date(l.data + 'T00:00:00Z').getUTCDay()] += l.valor;
+    const nomesWd = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+    const iw = wd.indexOf(Math.max(...wd)); fatos.push(['Dia da semana que mais gasta', cap(nomesWd[iw]), `${Math.round(wd[iw] / gs.reduce((a, l) => a + l.valor, 0) * 100)}% dos gastos`]);
+    const comGasto = new Set(gs.filter((l) => !l.origem).map((l) => l.data));
+    let best = 0, bIni = '', run = 0, rIni = ''; const hoje = todayISO();
+    for (let d0 = gs.map((l) => l.data).sort()[0]; d0 <= hoje; d0 = addDia(d0, 1)) {
+      if (comGasto.has(d0)) { run = 0; continue; }
+      if (!run) rIni = d0; run++; if (run > best) { best = run; bIni = rIni; }
+    }
+    if (best > 1) fatos.push(['Mais dias seguidos sem gastar', `${best} dias`, `a partir de ${dataBr(bIni)}`]);
+    const freq = new Map(); for (const l of gs) { const k = (l.desc || '').trim().toLowerCase(); if (k) freq.set(k, (freq.get(k) || 0) + 1); }
+    const fq = [...freq.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (fq && fq[1] > 2) fatos.push(['Gasto que mais se repete', cap(fq[0]), `${fq[1]} vezes`]);
+    const ent = ls.filter((l) => l.tipo === 'entrada').reduce((a, l) => a + l.valor, 0);
+    if (ent) fatos.push(['Já entrou no total', brl(ent), `e ${Math.round(gs.reduce((a, l) => a + l.valor, 0) / ent * 100)}% disso virou gasto`]);
+    body.append(h('div', { class: 'ledger' }, fatos.map(([t, v, s]) => [linhaE(t, v), s ? h('div', { class: 'sub2' }, h('span', null, s)) : null])));
+    sheet('Curiosidades', body);
+  }
+
+  // 8. número da versão: o que mudou
+  const NOVIDADES = [
+    ['2.16.1', 'Sem o botão Fechar nas telas que sobem: fecha arrastando a barrinha ou tocando fora.'],
+    ['2.16.0', 'Informações escondidas: tocar no pote, em Entrou/Gastou/Guardou, no quadro Hoje, no total do dia, na meta da caixinha e na maior categoria; segurar o logo mostra curiosidades; e esta lista.'],
+    ['2.15.1', 'Rosca por categoria nos gráficos, "Gastou no dia" no extrato, a conta do "pode gastar por dia" e planejados com a tela do Anotar.'],
+    ['2.13.1', 'Transferir entre caixinhas e rendimento aproximado pelo CDI.'],
+    ['2.11.1', 'Arrastar a barrinha pra baixo fecha as telas que sobem. A partir daqui o número da versão é o mesmo do Plin no Claude.'],
+    ['1.11', 'Aba Plano com um quadro só do mês e o Plano padrão recolhível.'],
+    ['1.10', 'Plano feito só para um mês e gasto que sai de caixinha.'],
+    ['1.6', '"Já paguei" nos gastos planejados.'],
+    ['1.5', 'Ícone novo de carteira e tema lavanda.'],
+    ['1.1', 'Olhinho no topo que esconde todos os valores.'],
+    ['1.0', 'Primeira versão do Plin.'],
+  ];
+  function openNovidades() {
+    sheet('O que mudou', h('div', { class: 'stack', style: 'gap:10px' }, NOVIDADES.map(([v, t], i) => h('div', { class: 'novid' + (i === 0 ? ' atual' : '') }, h('b', null, v), h('span', null, t)))));
+  }
+  (function ligarLogo() {
+    const mk = document.querySelector('.mark'); const ver = mk.querySelector('small');
+    let tm = null, x0 = 0, y0 = 0, segurou = false;
+    const parar = () => { clearTimeout(tm); tm = null; };
+    mk.addEventListener('pointerdown', (e) => { segurou = false; x0 = e.clientX; y0 = e.clientY; parar(); tm = setTimeout(() => { tm = null; segurou = true; if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) {} openCurio(); }, 600); });
+    mk.addEventListener('pointermove', (e) => { if (tm && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) parar(); });
+    mk.addEventListener('pointerup', parar); mk.addEventListener('pointercancel', parar); mk.addEventListener('pointerleave', parar);
+    mk.addEventListener('contextmenu', (e) => e.preventDefault());
+    ver.addEventListener('click', () => { if (segurou) { segurou = false; return; } openNovidades(); });
+  })();
+  $('livre-resta').addEventListener('click', openRitmo);
+  $('jar').addEventListener('click', openRitmo);
+  $('st-entrou').parentElement.addEventListener('click', () => openDetalhe('entrou'));
+  $('st-gastou').parentElement.addEventListener('click', () => openDetalhe('gastou'));
+  $('st-guardou').parentElement.addEventListener('click', () => openDetalhe('guardou'));
+
   // ---------- folhas (sheets) ----------
   function sheet(title, body) {
     const root = $('sheet-root');
     const close = () => { root.replaceChildren(); document.removeEventListener('keydown', esc); };
     const esc = (e) => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', esc);
-    const topo = h('div', { class: 'sheet-top' }, h('div', { class: 'grab' }), h('div', { class: 'sheet-h' }, h('h2', null, title), h('button', { class: 'x', type: 'button', onclick: close }, 'Fechar')));
+    const topo = h('div', { class: 'sheet-top' }, h('div', { class: 'grab' }), h('div', { class: 'sheet-h' }, h('h2', null, title)));
     const sh = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title }, topo, body);
     let downFora = false; // só fecha pelo fundo se o toque começou no fundo (a captura do arraste pode mandar o click pro fundo)
     const scrim = h('div', { class: 'scrim', onclick: (e) => { if (e.target === scrim && downFora) close(); } }, sh);
