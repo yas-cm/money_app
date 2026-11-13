@@ -89,6 +89,8 @@ button { cursor: pointer; }
 .dia .d b { font-family: var(--display); font-size: 1.35rem; }
 .dia .d small { font-size: .7rem; color: var(--muted); margin-top: 3px; }
 .dia .es { display: grid; gap: 2px; min-width: 0; }
+.dia-tot { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px 0; margin-top: 2px; border-top: 1px dashed var(--line); font-size: .78rem; color: var(--muted); font-weight: 600; }
+.dia-tot b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .en { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; text-align: left; border: 0; background: transparent; padding: 7px 8px; border-radius: 10px; width: 100%; }
 .en:hover { background: var(--field); }
 .en .t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -168,6 +170,11 @@ button { cursor: pointer; }
 .hoje > div:first-child { background: var(--mint-soft); border-color: transparent; }
 .big2 { font-family: var(--display); font-weight: 700; font-size: 1.25rem; }
 .hoje small { color: var(--muted); font-size: .74rem; }
+button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; background: var(--mint-soft); border: 1px solid transparent; border-radius: 14px; padding: 10px 12px; display: grid; gap: 1px; min-width: 0; }
+.conta .ledger { margin-top: 0; }
+.conta .ledger div.sub2 { font-size: .8rem; color: var(--muted); padding-left: 14px; }
+.conta .ledger div.res { font-weight: 700; padding-top: 6px; border-top: 1px solid var(--line); }
+.conta .ledger div.res b { font-size: 1.05rem; }
 .quick { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .quick::-webkit-scrollbar { display: none; }
 .quick button { flex: none; border: 1px dashed var(--muted); background: var(--panel); border-radius: 12px; padding: 7px 11px; display: grid; text-align: left; line-height: 1.15; }
@@ -176,7 +183,6 @@ button { cursor: pointer; }
 .cur-sel { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: middle; }
 .cur-sel button { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 2px 8px; font-size: .78rem; font-weight: 700; }
 .cur-sel button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.busca { width: 100%; min-width: 0; background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
 .passo { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; border: 0; background: transparent; text-align: left; width: 100%; padding: 7px 4px; border-radius: 10px; }
 .passo:hover { background: var(--field); }
 .passo .ck { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-size: .8rem; font-weight: 700; color: var(--panel); }
@@ -220,6 +226,16 @@ button { cursor: pointer; }
 .kpi b { font-size: clamp(.95rem, 4.2vw, 1.15rem); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi span { font-size: .72rem; color: var(--muted); font-weight: 600; }
 .bars { display: grid; gap: 2px; }
+.pizza { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: 14px; align-items: center; margin: 4px 0 10px; }
+.pizza svg { width: 100%; height: auto; display: block; }
+.pizza svg path { cursor: pointer; }
+.pizza .leg { display: grid; gap: 2px; min-width: 0; }
+.pizza .leg button { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 7px; align-items: center; border: 0; background: transparent; padding: 4px 4px; border-radius: 8px; text-align: left; font: inherit; font-size: .82rem; color: var(--ink); }
+.pizza .leg button[aria-pressed="true"] { background: var(--field); }
+.pizza .leg i { width: 10px; height: 10px; border-radius: 3px; }
+.pizza .leg span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pizza .leg small { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 600; }
+@media (max-width: 360px) { .pizza { grid-template-columns: 1fr; } .pizza svg { max-width: 11rem; margin: 0 auto; } }
 .bar { display: grid; grid-template-columns: minmax(0, 7.5rem) minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; border: 0; background: transparent; padding: 6px 6px; border-radius: 10px; text-align: left; width: 100%; }
 .bar:hover { background: var(--field); }
 .bar[aria-pressed="true"] { background: var(--field); outline: 2px solid var(--ink); outline-offset: -2px; }
@@ -303,8 +319,7 @@ button { cursor: pointer; }
       <div id="nm"></div>
     </div>
     <div class="panel">
-      <div class="grp-h"><h2>Extrato</h2><span class="sub num" id="busca-tot"></span></div>
-      <input type="search" id="busca" class="busca" placeholder="Buscar em todos os meses (ex.: mercado)" autocomplete="off">
+      <h2>Extrato</h2>
       <div id="lista"><div class="empty">Carregando o extrato…</div></div>
     </div>
   </section>
@@ -377,6 +392,7 @@ button { cursor: pointer; }
     <div class="kpis" id="gr-kpis"></div>
     <div class="panel">
       <div class="grp-h"><h2>Por categoria</h2><span class="sub" id="gr-cat-sub"></span></div>
+      <div id="gr-pizza" class="pizza"></div>
       <p class="sub">Toque numa categoria para ver ela mês a mês.</p>
       <div id="gr-cats" class="bars"></div>
     </div>
@@ -423,7 +439,7 @@ button { cursor: pointer; }
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.13.1';
+  const VERSAO = '2.15.1';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -793,26 +809,58 @@ button { cursor: pointer; }
     // hoje e quanto dá por dia (só no mês atual)
     const hojeEl = $('hoje'); const hoje = todayISO();
     if (mes === ymOf(hoje) && meta > 0) {
-      const gHoje = d.ls.filter((l) => l.tipo === 'gasto' && !l.origem && l.data === hoje).reduce((a, l) => a + l.valor, 0);
+      const gHoje = d.ls.filter((l) => l.tipo === 'gasto' && !l.origem && !l.pj && l.data === hoje).reduce((a, l) => a + l.valor, 0);
       const ultimo = new Date(Date.UTC(+mes.slice(0, 4), +mes.slice(5, 7), 0)).getUTCDate();
       const dias = ultimo - Number(hoje.slice(8, 10)) + 1;
       const livreDepois = resta + gHoje - o.pendente; // o que sobra pra hoje em diante, já tirando os planejados
       const porDia = Math.floor(livreDepois / dias);
       hojeEl.hidden = false;
+      const conta = { meta, o, gastouAntes: d.gastou - gHoje, livreDepois, dias, porDia, ultimo, hoje, gHoje };
       hojeEl.replaceChildren(
-        h('div', null, h('span', { class: 'label' }, 'Pode gastar por dia'), h('b', { class: 'big2 num' + (porDia < 0 ? ' neg' : '') }, porDia > 0 ? brl(porDia) : (oculto ? MASCARA : 'R$ 0')), h('small', null, `até dia ${ultimo}` + (o.pendente ? `, já guardando ${brl(o.pendente)} pros planejados e fixos` : ''))),
+        h('button', { class: 'pdia', type: 'button', onclick: () => openContaDia(conta), 'aria-label': 'Ver a conta do pode gastar por dia' }, h('span', { class: 'label' }, 'Pode gastar por dia'), h('b', { class: 'big2 num' + (porDia < 0 ? ' neg' : '') }, porDia > 0 ? brl(porDia) : (oculto ? MASCARA : 'R$ 0')), h('small', null, `até dia ${ultimo}` + (o.pendente ? `, já guardando ${brl(o.pendente)} pros planejados e fixos` : ''))),
         h('div', null, h('span', { class: 'label' }, 'Hoje'), h('b', { class: 'big2 num' + (porDia > 0 && gHoje > porDia ? ' neg' : '') }, brl(gHoje)), h('small', null, gHoje === 0 ? 'nada ainda' : porDia > 0 && gHoje > porDia ? `passou ${brl(gHoje - porDia)}` : `sobra ${brl(Math.max(0, porDia - gHoje))}`)));
     } else hojeEl.hidden = true;
     renderMesResto(d);
   }
+  // a conta do "pode gastar por dia", passo a passo
+  function openContaDia(c) {
+    const { o } = c;
+    const linha = (t, v, sinal, cls) => h('div', { class: cls || '' }, h('span', null, (sinal ? sinal + ' ' : '') + t), h('span', { class: 'lead' }), h('b', { class: 'num' + (v < 0 ? ' neg' : '') }, v < 0 ? '− ' + brl(-v) : brl(v)));
+    const sub = (t, v, sinal) => h('div', { class: 'sub2' }, h('span', null, (sinal ? sinal + ' ' : '') + t), h('span', { class: 'lead' }), h('span', { class: 'num' }, brl(v)));
+    const hojeN = Number(c.hoje.slice(8, 10));
+    const body = h('div', { class: 'stack conta', style: 'gap:14px' },
+      h('div', { class: 'ledger' },
+        linha('Livre do mês', c.meta),
+        ...(o.partes || []).map(([t, v, s]) => sub(t, v, s)),
+        linha('Gastos do mês, sem os de hoje', c.gastouAntes, '−'),
+        o.pendente ? linha('Planejados e fixos ainda não pagos', o.pendente, '−') : null,
+        ...(o.pendItens || []).map((x) => sub(x.t + ' (' + x.q + ')', x.v)),
+        linha(`Sobra pra hoje até dia ${c.ultimo}`, c.livreDepois, '=', 'res'),
+        h('div', null, h('span', null, '÷ Dias que faltam'), h('span', { class: 'lead' }), h('b', { class: 'num' }, `${c.dias} ${c.dias === 1 ? 'dia' : 'dias'}`)),
+        h('div', { class: 'sub2' }, h('span', null, c.dias === 1 ? 'só hoje' : `de hoje (dia ${hojeN}) até dia ${c.ultimo}, contando hoje`)),
+        linha('Pode gastar por dia', c.porDia, '=', 'res')),
+      h('p', { class: 'sub' }, 'Os gastos de hoje ficam fora da conta pra o valor não mudar durante o dia. Eles aparecem no quadro "Hoje"' + (c.gHoje ? `: hoje você gastou ${brl(c.gHoje)}` + (c.porDia > 0 ? (c.gHoje > c.porDia ? `, ${brl(c.gHoje - c.porDia)} acima do valor do dia` : `, sobram ${brl(c.porDia - c.gHoje)}`) : '') + '.' : '.') + ' Gastos que saíram de caixinha não contam, e pagamento planejado já estava separado, então não muda o valor do dia.'),
+      c.porDia <= 0 ? h('p', { class: 'sub neg' }, 'O Livre do mês já acabou, então não sobra nada por dia.') : null);
+    sheet('A conta do dia', body);
+  }
   // quanto do mês é para gastar (Livre), conforme o plano do mês
   function orcamento(ym, d) {
     const pl = planoDe(ym);
-    const pendente = cfg.planejados.filter((p) => !p.feito && p.mes === ym && (!p.sai || p.sai === 'Livre')).reduce((a, p) => a + p.valor, 0)
-      + recorrentesDe(ym).filter((r) => !r.feito).reduce((a, r) => a + r.valor, 0);
-    if (pl === 'fixo') return { meta: Math.round(cfg.rendaPrevista * (cfg.divisao.livre || 0) / 100), pendente, como: `(${cfg.divisao.livre}% da renda prevista)` };
-    if (pl === 'mes') return { meta: livreDoPlano(ym, d), pendente, como: '(do plano do mês)' };
-    return { meta: Math.max(0, d.entrou - d.guardou), pendente, como: '(o que entrou menos o que foi guardado)' };
+    const pendItens = [...cfg.planejados.filter((p) => !p.feito && p.mes === ym && (!p.sai || p.sai === 'Livre')).map((p) => ({ t: p.desc, v: p.valor, q: 'planejado' })),
+      ...recorrentesDe(ym).filter((r) => !r.feito).map((r) => ({ t: r.desc, v: r.valor, q: 'gasto fixo' }))];
+    const pendente = pendItens.reduce((a, x) => a + x.v, 0);
+    if (pl === 'fixo') {
+      const meta = Math.round(cfg.rendaPrevista * (cfg.divisao.livre || 0) / 100);
+      return { meta, pendente, pendItens, como: `(${cfg.divisao.livre}% da renda prevista)`, partes: [['Renda prevista', cfg.rendaPrevista], [`Fica no Livre: ${cfg.divisao.livre}%`, meta, '=']] };
+    }
+    if (pl === 'mes') {
+      const p = cfg.planosMes[ym], aps = p.aportes || [];
+      const renda = Math.max(d.entrou, p.renda || 0);
+      const aportes = aps.reduce((a, ap) => a + Math.max(ap.valor || 0, guardadoEm(ym, ap.cx)), 0);
+      const outros = d.guardou - aps.reduce((a, ap) => a + guardadoEm(ym, ap.cx), 0);
+      return { meta: livreDoPlano(ym, d), pendente, pendItens, como: '(do plano do mês)', partes: [[d.entrou >= (p.renda || 0) ? 'Renda do mês' : 'Renda prevista', renda], ['Aportes do plano', aportes, '−'], outros > 0 ? ['Outros guardados', outros, '−'] : null].filter(Boolean) };
+    }
+    return { meta: Math.max(0, d.entrou - d.guardou), pendente, pendItens, como: '(o que entrou menos o que foi guardado)', partes: [['Entrou', d.entrou], ['Guardou', d.guardou, '−']] };
   }
   // plano feito só para um mês: renda prevista menos os aportes (o que já foi guardado além do plano também sai do Livre)
   function livreDoPlano(ym, d) {
@@ -967,27 +1015,9 @@ button { cursor: pointer; }
     $('nm-p').hidden = !(pjs.length || lbs.length);
     $('nm').replaceChildren(
       ...lbs.map((l) => h('button', { class: 'en' + (l.feito ? ' done' : ''), type: 'button', onclick: () => openLembrete(l) }, h('span', { class: 't' }, l.texto), h('span', { class: 'v muted' }, l.data.split('-').reverse().slice(0, 2).join('/')), h('span', { class: 'meta' }, 'lembrete'))),
-      ...pjs.map((p) => h('button', { class: 'en' + (p.feito ? ' done' : ''), type: 'button', onclick: () => openPlanejado(p) }, h('span', { class: 't' }, p.desc), h('span', { class: 'v' }, brl(p.valor)), h('span', { class: 'meta' }, 'planejado' + (p.sai ? ' · sai de ' + p.sai : '') + (p.feito ? ' · pago' : '')))));
+      ...pjs.map((p) => h('button', { class: 'en' + (p.feito ? ' done' : ''), type: 'button', onclick: () => (p.feito ? openPlanejado(p) : pagarPlanejado(p)) }, h('span', { class: 't' }, p.desc), h('span', { class: 'v' }, brl(p.valor)), h('span', { class: 'meta' }, p.cat ? h('span', { class: 'tag' }, h('i', { style: `background:${catById('gasto', p.cat).cor}` }), catById('gasto', p.cat).nome) : null, 'planejado' + (p.sai ? ' · sai de ' + p.sai : '') + (p.feito ? ' · pago' : ' · toque para anotar o pagamento')))));
 
     const box = $('lista'); box.replaceChildren();
-    const q = ($('busca').value || '').trim().toLowerCase();
-    $('busca-tot').textContent = '';
-    if (q) {
-      const achou = all().filter((l) => (l.desc || '').toLowerCase().includes(q) || ((l.tipo === 'gasto' || l.tipo === 'entrada') && catById(l.tipo, l.cat).nome.toLowerCase().includes(q)) || [l.caixinha, l.origem, l.para].some((id) => (cxById(id) || { nome: '' }).nome.toLowerCase().includes(q)));
-      const gastos = achou.filter((l) => l.tipo === 'gasto').reduce((a, l) => a + l.valor, 0);
-      $('busca-tot').textContent = `${achou.length} achados` + (gastos ? ` · ${brl(gastos)} em gastos` : '');
-      if (!achou.length) { box.append(h('div', { class: 'empty' }, 'Nada encontrado.')); return; }
-      const byM = new Map();
-      for (const l of achou.sort((a, b) => b.data.localeCompare(a.data))) { const k = ymOf(l.data); if (!byM.has(k)) byM.set(k, []); byM.get(k).push(l); }
-      let n = 0;
-      for (const [m, ls] of byM) {
-        if (n > 120) break;
-        const tot = ls.filter((l) => l.tipo === 'gasto').reduce((a, l) => a + l.valor, 0);
-        box.append(h('div', { class: 'grp-h', style: 'margin-top:10px' }, h('span', { class: 'label' }, mLong(m)), h('span', { class: 'sub num' }, tot ? brl(tot) : '')));
-        for (const l of ls) { n++; const e = entryEl(l); e.querySelector('.meta').prepend(h('span', null, l.data.slice(8, 10) + '/' + l.data.slice(5, 7))); box.append(e); }
-      }
-      return;
-    }
     if (!d.ls.length) {
       box.append(h('div', { class: 'empty' }, h('div', null, 'Nada anotado em ' + monthF.format(ymDate(mes)) + '.'), store.podeGravar() ? h('button', { class: 'btn hot', type: 'button', onclick: () => openLanc() }, 'Anotar o primeiro') : null));
       return;
@@ -996,7 +1026,9 @@ button { cursor: pointer; }
     for (const l of [...d.ls].sort((a, b) => b.data.localeCompare(a.data) || (b.criadoEm || 0) - (a.criadoEm || 0))) { if (!byDay.has(l.data)) byDay.set(l.data, []); byDay.get(l.data).push(l); }
     for (const [dia, ls] of byDay) {
       const dt = new Date(dia + 'T00:00:00Z');
-      box.append(h('div', { class: 'dia' }, h('div', { class: 'd' }, h('b', null, String(dt.getUTCDate())), h('small', null, wdF.format(dt).replace('.', ''))), h('div', { class: 'es' }, ls.map(entryEl))));
+      const gDia = ls.filter((l) => l.tipo === 'gasto').reduce((a, l) => a + l.valor, 0);
+      box.append(h('div', { class: 'dia' }, h('div', { class: 'd' }, h('b', null, String(dt.getUTCDate())), h('small', null, wdF.format(dt).replace('.', ''))),
+        h('div', { class: 'es' }, ls.map(entryEl), gDia ? h('div', { class: 'dia-tot' }, h('span', null, 'Gastou no dia'), h('b', null, '− ' + brl(gDia))) : null)));
     }
   }
   function entryEl(l) {
@@ -1178,7 +1210,7 @@ button { cursor: pointer; }
   }
 
   // ---------- gráficos ----------
-  let per = 12, catSel = null, barSel = null;
+  let per = 1, catSel = null, barSel = null;
   function mesesDoPeriodo() {
     if (per > 0) { const ms = []; for (let k = per - 1; k >= 0; k--) ms.push(addMonths(mes, -k)); return ms; }
     const ks = Object.keys(meses).filter((k) => (meses[k] || []).some((l) => l.tipo === 'gasto')).sort();
@@ -1203,7 +1235,8 @@ button { cursor: pointer; }
 
     $('gr-kpis').replaceChildren(
       h('div', { class: 'kpi' }, h('span', null, ms.length === 1 ? 'Gasto no mês' : 'Gasto no período'), h('b', null, brl(tot))),
-      h('div', { class: 'kpi' }, h('span', null, 'Média por mês'), h('b', null, brl(Math.round(tot / comGasto)))),
+      ms.length === 1 ? h('div', { class: 'kpi' }, h('span', null, ms[0] === ymOf(todayISO()) ? 'Média por dia até hoje' : 'Média por dia'), h('b', null, brl(Math.round(tot / (ms[0] === ymOf(todayISO()) ? Number(todayISO().slice(8, 10)) : new Date(Date.UTC(+ms[0].slice(0, 4), +ms[0].slice(5, 7), 0)).getUTCDate())))))
+        : h('div', { class: 'kpi' }, h('span', null, 'Média por mês'), h('b', null, brl(Math.round(tot / comGasto)))),
       h('div', { class: 'kpi' }, h('span', null, 'Maior categoria'), h('b', { style: 'font-size:.95rem' }, maior ? maior.nome : '—')));
 
     // ranking por categoria (barras horizontais, mesma escala)
@@ -1218,6 +1251,7 @@ button { cursor: pointer; }
         h('span', { class: 'v' }, brl(v), h('small', null, Math.round(v / tot * 100) + '%')));
     }) : [h('div', { class: 'empty' }, 'Sem gastos no período.')]));
 
+    renderPizza(ord, tot);
     // mês a mês: no período (mínimo 12 meses para ter comparação)
     const msBar = ms.length < 12 && per !== 0 ? Array.from({ length: 12 }, (_, i) => addMonths(mes, i - 11)) : ms;
     const c = catSel ? catById('gasto', catSel) : null;
@@ -1261,6 +1295,41 @@ button { cursor: pointer; }
     const top5 = gs.filter((l) => !catSel || l.cat === catSel).sort((a, b) => b.valor - a.valor).slice(0, 5);
     $('gr-top-t').textContent = c ? `Maiores gastos em ${c.nome}` : 'Maiores gastos do período';
     $('gr-top').replaceChildren(...(top5.length ? top5.map((l) => { const cc = catById('gasto', l.cat); return h('button', { class: 'en', type: 'button', onclick: () => openLanc(l) }, h('span', { class: 't' }, l.desc || cc.nome), h('span', { class: 'v' }, brl(l.valor)), h('span', { class: 'meta' }, h('span', { class: 'tag' }, h('i', { style: `background:${cc.cor}` }), cc.nome), l.data.split('-').reverse().join('/'))); }) : [h('div', { class: 'empty' }, 'Nada no período.')]));
+  }
+
+  // pizza (rosca) dos gastos por categoria: até 6 fatias, o resto vira "Outras"
+  function renderPizza(ord, tot) {
+    const box = $('gr-pizza');
+    if (!ord.length || !(tot > 0)) { box.hidden = true; return; }
+    box.hidden = false;
+    let fatias = ord.map(([id, v]) => ({ id, v, c: catById('gasto', id) }));
+    if (fatias.length > 7) { const resto = fatias.slice(6); fatias = [...fatias.slice(0, 6), { id: null, v: resto.reduce((a, x) => a + x.v, 0), c: { nome: `Outras (${resto.length})`, cor: '#9a93b8' } }]; }
+    const S = 160, cx = S / 2, R = 76, r = 48;
+    const svg = sv('svg', { viewBox: `0 0 ${S} ${S}`, role: 'img', 'aria-label': 'Pizza dos gastos por categoria' });
+    const pt = (a, rad) => [cx + rad * Math.sin(a), cx - rad * Math.cos(a)];
+    let a0 = 0;
+    for (const f of fatias) {
+      const frac = f.v / tot, a1 = a0 + frac * Math.PI * 2;
+      const dim = catSel && f.id !== catSel;
+      const attrs = { fill: f.c.cor, opacity: dim ? .3 : 1, stroke: 'var(--panel)', 'stroke-width': 2, 'stroke-linejoin': 'round' };
+      let el;
+      if (frac >= .9999) el = sv('path', Object.assign({ d: `M${cx},${cx - R}A${R},${R} 0 1 1 ${cx - .01},${cx - R}Z M${cx},${cx - r}A${r},${r} 0 1 0 ${cx + .01},${cx - r}Z`, 'fill-rule': 'evenodd' }, attrs));
+      else {
+        const big = a1 - a0 > Math.PI ? 1 : 0;
+        const [x0, y0] = pt(a0, R), [x1, y1] = pt(a1, R), [x2, y2] = pt(a1, r), [x3, y3] = pt(a0, r);
+        el = sv('path', Object.assign({ d: `M${x0},${y0}A${R},${R} 0 ${big} 1 ${x1},${y1}L${x2},${y2}A${r},${r} 0 ${big} 0 ${x3},${y3}Z` }, attrs));
+      }
+      el.append(sv('title', {}, `${f.c.nome}: ${brl(f.v)} (${Math.round(frac * 100)}%)`));
+      if (f.id) el.addEventListener('click', () => { catSel = catSel === f.id ? null : f.id; barSel = null; renderGraficos(); });
+      svg.append(el);
+      a0 = a1;
+    }
+    const foco = catSel ? fatias.find((f) => f.id === catSel) : null;
+    svg.append(sv('text', { x: cx, y: cx - 4, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)' }, foco ? Math.round(foco.v / tot * 100) + '%' : brl(tot).replace('R$', '').trim()));
+    svg.append(sv('text', { x: cx, y: cx + 13, 'text-anchor': 'middle', 'font-size': 9.5, fill: 'var(--muted)', 'font-weight': 600 }, foco ? (foco.c.nome.length > 14 ? foco.c.nome.slice(0, 13) + '…' : foco.c.nome) : 'reais gastos'));
+    const leg = h('div', { class: 'leg' }, fatias.map((f) => h('button', { type: 'button', 'aria-pressed': String(!!f.id && catSel === f.id), disabled: !f.id, onclick: () => { if (!f.id) return; catSel = catSel === f.id ? null : f.id; barSel = null; renderGraficos(); } },
+      h('i', { style: `background:${f.c.cor}` }), h('span', null, f.c.nome), h('small', null, Math.round(f.v / tot * 100) + '%'))));
+    box.replaceChildren(svg, leg);
   }
 
   // ---------- folhas (sheets) ----------
@@ -1485,9 +1554,11 @@ button { cursor: pointer; }
     if (!st.cat && (st.tipo === 'gasto' || st.tipo === 'entrada')) st.cat = (catsPorUso(st.tipo, uso)[0] || {}).id;
     paint();
     const save = h('button', { class: 'btn hot', type: 'button', style: 'flex:1' }, edit ? 'Salvar' : 'Anotar');
+    const pjAlvo = !edit && st.pj ? cfg.planejados.find((x) => x.id === st.pj) : null;
+    const pjNota = pjAlvo ? h('div', { class: 'notice', style: 'display:flex;justify-content:space-between;align-items:center;gap:8px' }, h('span', null, `Pagamento planejado: “${pjAlvo.desc}”. Ao anotar, ele fica como pago.`), h('button', { class: 'x', type: 'button', onclick: () => { sh.close(); openPlanejado(pjAlvo); } }, 'Editar')) : null;
     const quick = !l && uso.atalhos.length ? h('div', { class: 'field' }, h('span', null, 'Atalhos (um toque anota hoje)'), h('div', { class: 'quick' }, uso.atalhos.map((a) => h('button', { type: 'button', onclick: () => { sh.close(); anotarAtalho(a); } }, h('b', null, a.desc), h('small', null, brl(a.valor) + ' · ' + catById('gasto', a.cat).nome))))) : null;
-    const body = h('div', { class: 'stack', style: 'gap:12px' }, quick, kinds, h('div', { class: 'amount' }, curEl, amtEl, edit ? null : curSel), convEl, cotField, pad, origemBox, field('Descrição', desc), dl, cats, extra, field('Data', data),
-      h('div', { class: 'row-btns' }, save, edit ? h('button', { class: 'btn danger', type: 'button', onclick: async () => { sh.close(); await tirarLanc(l); toast('Excluído.' + avisoCx(l), { label: 'Desfazer', fn: () => porLanc(l) }); } }, l.parc ? 'Excluir só esta' : 'Excluir') : null,
+    const body = h('div', { class: 'stack', style: 'gap:12px' }, quick, pjNota, kinds, h('div', { class: 'amount' }, curEl, amtEl, edit ? null : curSel), convEl, cotField, pad, origemBox, field('Descrição', desc), dl, cats, extra, field('Data', data),
+      h('div', { class: 'row-btns' }, save, edit ? h('button', { class: 'btn danger', type: 'button', onclick: async () => { sh.close(); await tirarLanc(l); if (l.pj) await marcarPj(l.pj, false); toast('Excluído.' + avisoCx(l), { label: 'Desfazer', fn: async () => { await porLanc(l); if (l.pj) await marcarPj(l.pj, true); } }); } }, l.parc ? 'Excluir só esta' : 'Excluir') : null,
         edit && l.parc ? dangerBtn(`Excluir as ${l.parc.n} parcelas`, async () => { sh.close(); await tirarParcelas(l.parc.id); toast('Parcelas excluídas.'); }) : null),
       edit && l.parc ? h('p', { class: 'sub' }, `Parcela de uma compra de ${brl(l.parc.total)} em ${l.parc.n}x. Mudar aqui muda só esta parcela.`) : null);
     const sh = sheet(edit ? 'Editar' : 'Anotar', body);
@@ -1519,7 +1590,7 @@ button { cursor: pointer; }
       }
       else { if (!st.caixinha) { toast('Crie uma caixinha primeiro.'); return; } rec.caixinha = st.caixinha; }
       if (st.rec) rec.rec = st.rec;
-      if (st.pj) rec.pj = st.pj;
+      if (st.pj && rec.tipo === 'gasto') rec.pj = st.pj;
       if (l && l.parc) rec.parc = l.parc;
       sh.close();
       const n = !edit && st.tipo === 'gasto' ? (st.parcelas || 1) : 1;
@@ -1535,12 +1606,14 @@ button { cursor: pointer; }
         for (const r of recs) (meses[ymOf(r.data)] = meses[ymOf(r.data)] || []).push(r);
         mes = ymOf(rec.data); render();
         for (const ym of new Set(recs.map((r) => ymOf(r.data)))) await salvarMes(ym);
-        toast(`Plin! ${n}x de ${brl(base)} anotadas.` + avisoCx(recs[0]) + avisoTeto(recs[0]), { label: 'Desfazer', fn: () => tirarParcelas(pid) });
+        if (rec.pj) await marcarPj(rec.pj, true);
+        toast(`Plin! ${n}x de ${brl(base)} anotadas.` + avisoCx(recs[0]) + avisoTeto(recs[0]), { label: 'Desfazer', fn: async () => { await tirarParcelas(pid); if (rec.pj) await marcarPj(rec.pj, false); } });
         return;
       }
       if (edit && ymOf(l.data) !== ymOf(rec.data)) await tirarLanc(l);
       mes = ymOf(rec.data);
       await porLanc(rec);
+      if (rec.pj && !edit) { await marcarPj(rec.pj, true); toast(`Plin! Pago: ${(cfg.planejados.find((x) => x.id === rec.pj) || { desc: rec.desc }).desc}.` + avisoCx(rec) + avisoTeto(rec), { label: 'Desfazer', fn: async () => { await tirarLanc(rec); await marcarPj(rec.pj, false); } }); return; }
       toast((rec.tipo === 'transferir' && !edit ? 'Transferido.' : edit ? 'Salvo.' : 'Plin! Anotado.') + avisoCx(rec, edit ? l : null) + avisoTeto(rec));
     }
     save.addEventListener('click', go);
@@ -1613,26 +1686,67 @@ button { cursor: pointer; }
     });
   }
 
+  async function marcarPj(id, feito) {
+    const p = cfg.planejados.find((x) => x.id === id);
+    if (!p || !!p.feito === feito) return;
+    cfg.planejados = cfg.planejados.map((x) => (x.id === id ? Object.assign({}, x, { feito }) : x));
+    render(); await salvarCfg();
+  }
+  const pagarPlanejado = (p) => anotarPlanejado(p, true);
   function openPlanejado(p) {
     if (bloqueado()) return;
-    const desc = h('input', { type: 'text', id: 'pj-desc', value: p ? p.desc : '', placeholder: 'Ex.: Presentes de Natal' });
-    const valor = moneyInput(p && p.valor); valor.id = 'pj-valor';
+    // mesmo jeito do Anotar: valor grande com teclado, descrição e categorias em etiquetas
+    let amt = p && p.valor ? centStr(p.valor).replace(/\./g, '') : '';
+    const amtEl = h('b', null, '0,00');
+    const paintAmt = () => { amtEl.textContent = amt || '0,00'; amtEl.className = amt ? '' : 'zero'; };
+    const press = (k) => {
+      if (k === 'del') amt = amt.slice(0, -1);
+      else if (k === ',') { if (!amt.includes(',')) amt = (amt || '0') + ','; }
+      else { const dec = amt.split(',')[1]; if (dec != null && dec.length >= 2) return; if (amt.replace(',', '').length >= 9) return; amt = amt === '0' ? k : amt + k; }
+      paintAmt();
+    };
+    const pad = h('div', { class: 'pad' }, ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'del'].map((k) => h('button', { type: 'button', 'aria-label': k === 'del' ? 'Apagar' : k, onclick: () => press(k) }, k === 'del' ? '⌫' : k)));
+    paintAmt();
+    const uso = usoRecente();
+    const desc = h('input', { type: 'text', id: 'pj-desc', value: p ? p.desc : '', placeholder: 'O que é? Ex.: Presentes de Natal', autocomplete: 'off' });
+    let cat = (p && p.cat) || '';
+    let catManual = !!cat;
+    const cats = h('div', { class: 'chips' });
+    const paintCats = () => cats.replaceChildren(...catsPorUso('gasto', uso, cat).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(cat === c.id), onclick: () => { cat = cat === c.id ? '' : c.id; catManual = true; paintCats(); } }, h('i', { style: `background:${c.cor}` }), c.nome)));
+    paintCats();
+    desc.addEventListener('input', () => {
+      if (catManual) return;
+      const m = uso.descCat[desc.value.trim().toLowerCase()]; if (!m) return;
+      const melhor = Object.entries(m).filter(([k]) => k.startsWith('gasto:')).sort((a, b) => b[1] - a[1])[0];
+      if (melhor && melhor[0].slice(6) !== cat) { cat = melhor[0].slice(6); paintCats(); }
+    });
     const mesIn = h('input', { type: 'month', id: 'pj-mes', value: p ? p.mes || '' : mes });
     const feito = h('input', { type: 'checkbox', id: 'pj-feito' }); feito.checked = !!(p && p.feito);
     const ligados = p ? all().filter((l) => l.pj === p.id) : [];
     const fontes = ['Livre', '13º', ...cfg.caixinhas.map((c) => c.nome)];
-    const sai = h('select', { id: 'pj-sai' }, h('option', { value: '' }, 'Não definido'), [...new Set(fontes)].map((f) => h('option', { value: f }, f))); sai.value = (p && p.sai) || '';
-    const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, p ? 'Salvar' : 'Adicionar');
-    const body = h('div', { class: 'stack', style: 'gap:12px' }, field('O que é', desc), h('div', { class: 'two' }, field('Valor', valor), field('Mês (opcional)', mesIn)), field('Sai de', sai),
+    const sai = h('select', { id: 'pj-sai' }, h('option', { value: '' }, 'Não definido'), [...new Set(fontes)].map((f) => h('option', { value: f }, f))); sai.value = p ? (p.sai || '') : 'Livre';
+    const save = h('button', { class: 'btn hot', type: 'button', style: 'flex:1' }, p ? 'Salvar' : 'Adicionar');
+    const body = h('div', { class: 'stack', style: 'gap:12px' },
+      h('div', { class: 'amount' }, h('span', { class: 'cur' }, 'R$'), amtEl), pad,
+      field('Descrição', desc),
+      h('div', { class: 'field' }, h('span', null, 'Categoria (toque de novo para tirar)'), cats),
+      h('div', { class: 'two' }, field('Mês (opcional)', mesIn), field('Sai de', sai)),
       h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:600' }, feito, 'Já paguei'),
       h('div', { class: 'row-btns' }, save, p ? dangerBtn('Excluir', async () => { cfg.planejados = cfg.planejados.filter((x) => x.id !== p.id); sh.close(); render(); await salvarCfg(); toast('Excluído.'); }) : null));
     // pago sem gasto anotado (marcado antes desta versão): oferece anotar agora
     if (p && p.feito && !ligados.length) body.append(h('p', { class: 'sub' }, 'Marcado como pago, mas o gasto não foi anotado, então não saiu do mês. ', h('button', { class: 'btn alt', type: 'button', style: 'margin-top:6px', onclick: () => { sh.close(); anotarPlanejado(p); } }, 'Anotar o gasto agora')));
     const sh = sheet(p ? 'Gasto planejado' : 'Novo gasto planejado', body);
+    sh.el.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (/^[0-9]$/.test(e.key)) { press(e.key); e.preventDefault(); }
+      else if (e.key === ',' || e.key === '.') { press(','); e.preventDefault(); }
+      else if (e.key === 'Backspace') { press('del'); e.preventDefault(); }
+    });
     save.addEventListener('click', async () => {
-      const v = parseCent(valor.value);
-      if (!desc.value.trim() || !(v > 0)) { toast('Preencha o que é e o valor.'); return; }
+      const v = parseCent(amt);
+      if (!desc.value.trim() || !(v > 0)) { toast('Preencha o valor e o que é.'); return; }
       const rec = { id: p ? p.id : uid(), desc: desc.value.trim(), valor: v, mes: mesIn.value || '', feito: feito.checked, sai: sai.value };
+      if (cat) rec.cat = cat;
       cfg.planejados = p ? cfg.planejados.map((x) => (x.id === p.id ? rec : x)) : [...cfg.planejados, rec];
       sh.close(); render(); await salvarCfg();
       if (rec.feito && !(p && p.feito) && !ligados.length) { anotarPlanejado(rec); return; }
@@ -1644,13 +1758,17 @@ button { cursor: pointer; }
       toast('Salvo.');
     });
   }
+
   // marcar planejado como pago abre o Anotar já preenchido; o gasto fica ligado pelo campo pj
-  function anotarPlanejado(p) {
+  function anotarPlanejado(p, quieto) {
     const cx = p.sai && p.sai !== 'Livre' ? cfg.caixinhas.find((c) => c.nome === p.sai) : null;
     const hoje = todayISO();
     const data = p.mes && p.mes < ymOf(hoje) ? p.mes + '-' + String(new Date(Date.UTC(+p.mes.slice(0, 4), +p.mes.slice(5, 7), 0)).getUTCDate()).padStart(2, '0') : hoje;
-    openLanc({ tipo: 'gasto', valor: p.valor, desc: p.desc, data, origem: cx ? cx.id : '', pj: p.id, novo: true });
-    toast(cx ? `Anote o gasto: ele sai da caixinha ${cx.nome}.` : 'Anote o gasto pra ele sair do mês.');
+    const uso = usoRecente(); const m = uso.descCat[(p.desc || '').trim().toLowerCase()];
+    const sug = m ? Object.entries(m).filter(([k]) => k.startsWith('gasto:')).sort((a, b) => b[1] - a[1]).map(([k]) => k.slice(6))[0] : '';
+    const cat = (p.cat && catsOf('gasto').some((c) => c.id === p.cat) ? p.cat : sug) || '';
+    openLanc({ tipo: 'gasto', valor: p.valor, desc: p.desc, cat, data, origem: cx ? cx.id : '', pj: p.id, novo: true });
+    if (!quieto) toast(cx ? `Anote o gasto: ele sai da caixinha ${cx.nome}.` : 'Anote o gasto pra ele sair do mês.');
   }
 
   function openRec(r) {
@@ -1878,7 +1996,6 @@ button { cursor: pointer; }
   $('lb-new').addEventListener('click', () => openLembrete());
   $('rc-new').addEventListener('click', () => openRec());
   $('af-new').addEventListener('click', () => openAporte());
-  $('busca').addEventListener('input', () => renderMes());
   $('cg-new').addEventListener('click', () => openCat(catTab));
   $('gr-per').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { per = Number(b.dataset.p); barSel = null; renderGraficos(); } });
   $('gr-limpar').addEventListener('click', () => { catSel = null; barSel = null; renderGraficos(); });
