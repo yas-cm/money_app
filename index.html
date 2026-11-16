@@ -140,12 +140,12 @@ button { cursor: pointer; }
 .opt input { margin-top: 3px; width: 18px; height: 18px; flex: none; accent-color: var(--tang); }
 .opt small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; margin-top: 2px; }
 .es .en { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-svg.ic { width: 14px; height: 14px; flex: none; display: inline-block; }
-.chip svg.ic { width: 18px; height: 18px; margin-left: -3px; }
-.teto .t svg.ic { width: 15px; height: 15px; vertical-align: -3px; margin-right: 4px; }
+svg.ic { width: 17px; height: 17px; flex: none; display: inline-block; }
+.chip svg.ic { width: 22px; height: 22px; margin-left: -4px; }
+.teto .t svg.ic { width: 18px; height: 18px; vertical-align: -4px; margin-right: 4px; }
 .icones { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
 .icones button { aspect-ratio: 1; border: 1px solid var(--line); background: var(--panel); border-radius: 12px; display: grid; place-items: center; padding: 0; }
-.icones button svg.ic { width: 24px; height: 24px; }
+.icones button svg.ic { width: 28px; height: 28px; }
 .icones button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
 .icones .sem i { width: 12px; height: 12px; border-radius: 3px; display: block; }
 .modo-orc { justify-content: center; }
@@ -468,7 +468,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.18.0';
+  const VERSAO = '2.18.1';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -1761,6 +1761,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.18.1', 'Ícones das categorias maiores.'],
     ['2.18.0', 'Ícones de linha nas categorias (dá pra trocar o ícone em Números > Categorias), opção de ver o orçamento por semana em vez de por dia (dentro da conta do "Pode gastar"), segurar um lançamento do extrato pra anotar igual de novo, atalho "Anotar gasto" segurando o ícone do app e opção de sempre abrir com os valores escondidos.'],
     ['2.17.1', 'Mandar backup agora abre o Compartilhar de verdade (o arquivo vai como .txt, e o Importar aceita .txt e .json).'],
     ['2.17.0', 'Backup: botão Mandar backup (Drive, WhatsApp...) pelo Compartilhar do celular, o aviso aparece depois de 7 dias sem backup, e importar agora deixa juntar o arquivo com o que já está no Plin, sem apagar nada.'],
