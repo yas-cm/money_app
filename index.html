@@ -436,7 +436,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
         <button class="btn alt" type="button" id="ex-bkp">Salvar backup</button>
         <button class="btn alt" type="button" id="ex-mandar" hidden>Mandar backup</button>
         <label class="btn alt" for="im-bkp">Importar backup</label>
-        <input type="file" id="im-bkp" accept=".json,application/json" hidden>
+        <input type="file" id="im-bkp" accept=".json,.txt,application/json,text/plain" hidden>
       </div>
       <p class="sub" id="diag">—</p>
     </div>
@@ -450,7 +450,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.17.0';
+  const VERSAO = '2.17.1';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -1028,14 +1028,15 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     if (await oferecerArquivo(`plin-backup-${todayISO()}.json`, JSON.stringify(backupObj(), null, 1))) { lsSet('plin-ultimo-backup', String(Date.now())); renderBackupAviso(); }
   }
   // mandar o backup pelo Compartilhar do celular (Drive, WhatsApp, e-mail...): fica guardado fora do aparelho
-  const arquivoBackup = () => new File([JSON.stringify(backupObj(), null, 1)], `plin-backup-${todayISO()}.json`, { type: 'application/json' });
-  const podeMandar = () => { try { return !!(navigator.canShare && navigator.share && navigator.canShare({ files: [new File(['{}'], 'x.json', { type: 'application/json' })] })); } catch (e) { return false; } };
+  // o Chrome do Android não compartilha arquivos .json, então o backup vai como .txt (o conteúdo é o mesmo, e o Importar aceita os dois)
+  const arquivoBackup = () => new File([JSON.stringify(backupObj(), null, 1)], `plin-backup-${todayISO()}.txt`, { type: 'text/plain' });
+  const podeMandar = () => { try { return !!(navigator.canShare && navigator.share && navigator.canShare({ files: [new File(['{}'], 'x.txt', { type: 'text/plain' })] })); } catch (e) { return false; } };
   async function mandarBackup() {
     if (!podeMandar()) return salvarBackup();
     try {
-      await navigator.share({ files: [arquivoBackup()], title: 'Backup do Plin' });
+      await navigator.share({ files: [arquivoBackup()] });
       lsSet('plin-ultimo-backup', String(Date.now())); renderBackupAviso(); toast('Backup mandado.');
-    } catch (e) { if (!e || e.name !== 'AbortError') { toast('Não deu pra compartilhar. Salvei o arquivo no aparelho.'); salvarBackup(); } }
+    } catch (e) { if (!e || e.name !== 'AbortError') { await salvarBackup(); toast(`Não deu pra compartilhar (${(e && e.name) || 'erro'}). Salvei o arquivo no aparelho.`, null, 6000); } }
   }
   function renderMesResto(d) {
     renderPagamentos(d); renderTetos(); renderFechamento(); renderBackupAviso();
@@ -1596,6 +1597,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.17.1', 'Mandar backup agora abre o Compartilhar de verdade (o arquivo vai como .txt, e o Importar aceita .txt e .json).'],
     ['2.17.0', 'Backup: botão Mandar backup (Drive, WhatsApp...) pelo Compartilhar do celular, o aviso aparece depois de 7 dias sem backup, e importar agora deixa juntar o arquivo com o que já está no Plin, sem apagar nada.'],
     ['2.16.2', 'Consertos: o app percebe a virada do dia, gasto fixo do dia 29 a 31 fica no dia certo, o fundo não rola mais com uma tela aberta (e dá pra fechar arrastando de qualquer ponto), atualização sem perder o que você digitava, planilha com sinal certo e importar que grava tudo de uma vez.'],
     ['2.16.1', 'Sem o botão Fechar nas telas que sobem: fecha arrastando a barrinha ou tocando fora.'],
