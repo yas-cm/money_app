@@ -156,6 +156,12 @@ svg.ic { width: 17px; height: 17px; flex: none; display: inline-block; }
 .cat-grade .chip.cat span.l1 { font-size: .66rem; }
 .cat-grade .chip.cat span.l2 { font-size: .6rem; letter-spacing: -.02em; }
 .cat-grade .chip.cat[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 16%, var(--panel)); color: var(--ink); border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
+.cat-grade.compacta .chip.cat { padding: 7px 2px 6px; gap: 3px; border-radius: 12px; }
+.cat-grade.compacta .chip.cat svg.ic { width: 24px; height: 24px; }
+.cat-grade.compacta .chip.cat i { width: 18px; height: 18px; margin: 3px 0; }
+.cat-grade.compacta .teto-tag { margin: 0; font-size: .6rem; line-height: 1; }
+.cat-grade .arq-tog { grid-column: 1 / -1; font: inherit; font-size: .8rem; font-weight: 700; color: var(--muted); background: none; border: 0; text-align: left; padding: 8px 2px 2px; }
+.cat-grade .arq-tog small { font-weight: 500; }
 .modo-orc { justify-content: center; }
 .modo-orc .chip { padding: 4px 12px; font-size: .78rem; }
 .swatch { width: 30px; height: 30px; border-radius: 9px; border: 2px solid transparent; }
@@ -447,7 +453,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
         <button class="chip" type="button" data-k="gasto" aria-pressed="true">Gastos</button>
         <button class="chip" type="button" data-k="entrada" aria-pressed="false">Entradas</button>
       </div>
-      <div class="chips" id="cg-list"></div>
+      <div class="chips cat-grade compacta" id="cg-list"></div>
       <div class="row-btns"><button class="btn alt" type="button" id="cg-new">Nova categoria</button></div>
     </div>
     <div class="panel">
@@ -1406,12 +1412,14 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     $('cfg-save').disabled = t !== 100;
   }
 
+  let verArq = false;
   function renderNumeros() {
     for (const b of $('cg-seg').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.k === catTab));
-    const chipCat = (c) => h('button', { class: 'chip' + (c.arquivada ? ' arq' : ''), type: 'button', onclick: () => openCat(catTab, c) }, marca(c), c.nome, c.teto > 0 ? h('small', { class: 'teto-tag' }, 'teto ' + brl(c.teto)) : null);
+    const chipCat = (c) => h('button', { class: 'chip cat' + (c.arquivada ? ' arq' : ''), style: `--c:${c.cor}`, type: 'button', onclick: () => openCat(catTab, c) }, marca(c), nomeCat(c.nome), c.teto > 0 ? h('small', { class: 'teto-tag' }, 'teto ' + brl(c.teto)) : null);
     const ativas = catsOf(catTab).filter((c) => !c.arquivada), arqs = catsOf(catTab).filter((c) => c.arquivada);
+    // arquivadas ficam recolhidas pra não ocupar espaço
     $('cg-list').replaceChildren(...[...ativas.map(chipCat),
-      arqs.length ? h('div', { class: 'label', style: 'width:100%;margin-top:8px' }, 'Arquivadas (não aparecem no Anotar)') : null, ...arqs.map(chipCat)].filter(Boolean));
+      arqs.length ? h('button', { class: 'arq-tog', type: 'button', 'aria-expanded': String(verArq), onclick: () => { verArq = !verArq; renderNumeros(); } }, `${verArq ? '▾' : '▸'} Arquivadas (${arqs.length})`, h('small', null, ' não aparecem no Anotar')) : null, ...(verArq ? arqs.map(chipCat) : [])].filter(Boolean));
 
     const n = all().length;
     $('diag').textContent = `Plin ${VERSAO} · ${n} lançamentos · dados: ${$('status').textContent}` + (store.erro ? ` (${store.erro})` : '') + (store.modo === 'local-ls' ? ' · usando localStorage' : '');
