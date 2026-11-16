@@ -179,7 +179,7 @@ svg.ic { width: 17px; height: 17px; flex: none; display: inline-block; }
 .sem .tr i { display: block; height: 100%; background: var(--tang); border-radius: 4px; }
 .sem.agora span:first-child { font-weight: 700; }
 .sem b { font-size: .84rem; }
-.sv-opt { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.sv-opt { margin: 2px 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .modo-orc { justify-content: center; }
 .modo-orc .chip { padding: 4px 12px; font-size: .78rem; }
 .swatch { width: 30px; height: 30px; border-radius: 9px; border: 2px solid transparent; }
@@ -448,6 +448,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     <div class="kpis" id="gr-kpis"></div>
     <div class="panel">
       <div class="grp-h"><h2>Por categoria</h2><span class="sub" id="gr-cat-sub"></span></div>
+      <label class="opt sv-opt" id="gr-sv-w" hidden><input type="checkbox" id="gr-sv"> <span>Sem viagem<small>Tira a Viagem das médias e de todos os gráficos.</small></span></label>
       <div id="gr-pizza" class="pizza"></div>
       <p class="sub">Toque numa categoria para ver ela mês a mês.</p>
       <div id="gr-cats" class="bars"></div>
@@ -457,7 +458,6 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       <p class="sub" id="gr-mes-sub">—</p>
       <div class="chart" id="gr-mes"></div>
       <div class="readout" id="gr-read"></div>
-      <label class="opt sv-opt" id="gr-sv-w" hidden><input type="checkbox" id="gr-sv"> <span>Sem viagem<small>Tira a categoria Viagem das médias e de todos os gráficos.</small></span></label>
     </div>
     <div class="panel">
       <h2 id="gr-top-t">Maiores gastos do período</h2>
