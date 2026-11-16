@@ -434,6 +434,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       <div class="row-btns">
         <button class="btn" type="button" id="ex-csv">Exportar planilha</button>
         <button class="btn alt" type="button" id="ex-bkp">Salvar backup</button>
+        <button class="btn alt" type="button" id="ex-mandar" hidden>Mandar backup</button>
         <label class="btn alt" for="im-bkp">Importar backup</label>
         <input type="file" id="im-bkp" accept=".json,application/json" hidden>
       </div>
@@ -449,7 +450,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.16.2';
+  const VERSAO = '2.17.0';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -1017,14 +1018,24 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const n = $('bkp-n'); const agora = Date.now(); const DIA = 86400000;
     const ult = Number(lsGet('plin-ultimo-backup')) || 0;
     const adiado = Number(lsGet('plin-backup-adiado')) || 0;
-    const show = carregou && all().length > 0 && agora - ult > 30 * DIA && agora > adiado;
+    const show = carregou && all().length > 0 && agora - ult > 7 * DIA && agora > adiado;
     n.hidden = !show; if (!show) return;
     n.replaceChildren(h('span', null, ult ? `Faz ${Math.floor((agora - ult) / DIA)} dias do último backup.` : 'Você ainda não salvou um backup deste Plin.'),
-      h('span', null, h('button', { type: 'button', class: 'alt2', onclick: () => { lsSet('plin-backup-adiado', String(agora + 7 * DIA)); renderBackupAviso(); } }, 'Depois'),
-        h('button', { type: 'button', onclick: salvarBackup }, 'Salvar backup')));
+      h('span', null, h('button', { type: 'button', class: 'alt2', onclick: () => { lsSet('plin-backup-adiado', String(agora + 2 * DIA)); renderBackupAviso(); } }, 'Depois'),
+        h('button', { type: 'button', onclick: podeMandar() ? mandarBackup : salvarBackup }, podeMandar() ? 'Mandar backup' : 'Salvar backup')));
   }
   async function salvarBackup() {
     if (await oferecerArquivo(`plin-backup-${todayISO()}.json`, JSON.stringify(backupObj(), null, 1))) { lsSet('plin-ultimo-backup', String(Date.now())); renderBackupAviso(); }
+  }
+  // mandar o backup pelo Compartilhar do celular (Drive, WhatsApp, e-mail...): fica guardado fora do aparelho
+  const arquivoBackup = () => new File([JSON.stringify(backupObj(), null, 1)], `plin-backup-${todayISO()}.json`, { type: 'application/json' });
+  const podeMandar = () => { try { return !!(navigator.canShare && navigator.share && navigator.canShare({ files: [new File(['{}'], 'x.json', { type: 'application/json' })] })); } catch (e) { return false; } };
+  async function mandarBackup() {
+    if (!podeMandar()) return salvarBackup();
+    try {
+      await navigator.share({ files: [arquivoBackup()], title: 'Backup do Plin' });
+      lsSet('plin-ultimo-backup', String(Date.now())); renderBackupAviso(); toast('Backup mandado.');
+    } catch (e) { if (!e || e.name !== 'AbortError') { toast('Não deu pra compartilhar. Salvei o arquivo no aparelho.'); salvarBackup(); } }
   }
   function renderMesResto(d) {
     renderPagamentos(d); renderTetos(); renderFechamento(); renderBackupAviso();
@@ -1585,6 +1596,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.17.0', 'Backup: botão Mandar backup (Drive, WhatsApp...) pelo Compartilhar do celular, o aviso aparece depois de 7 dias sem backup, e importar agora deixa juntar o arquivo com o que já está no Plin, sem apagar nada.'],
     ['2.16.2', 'Consertos: o app percebe a virada do dia, gasto fixo do dia 29 a 31 fica no dia certo, o fundo não rola mais com uma tela aberta (e dá pra fechar arrastando de qualquer ponto), atualização sem perder o que você digitava, planilha com sinal certo e importar que grava tudo de uma vez.'],
     ['2.16.1', 'Sem o botão Fechar nas telas que sobem: fecha arrastando a barrinha ou tocando fora.'],
     ['2.16.0', 'Informações escondidas: tocar no pote, em Entrou/Gastou/Guardou, no quadro Hoje, no total do dia, na meta da caixinha e na maior categoria; segurar o logo mostra curiosidades; e esta lista.'],
@@ -2259,6 +2271,44 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       toast('Arquivo baixado.'); return true;
     } catch (e) { toast('Não foi possível baixar o arquivo.'); return false; }
   }
+  // grava o resultado do importar (trocar ou juntar) de uma vez só: ou entra tudo, ou nada muda
+  async function gravarImport(dados) {
+    const agora = Date.now();
+    const pares = [['plin/config', Object.assign({}, dados.cfg, { atualizadoEm: agora })],
+      ...[...new Set([...Object.keys(meses), ...Object.keys(dados.meses)])].map((ym) => ['meses/' + ym, { itens: dados.meses[ym] || [], atualizadoEm: agora }])];
+    try { await store.gravarVarios(pares); } catch (e) { toast('Não consegui importar. Nada foi mudado.'); return false; }
+    cfg = dados.cfg; meses = dados.meses; render(); return true;
+  }
+  // juntar um backup com o que já está no Plin: nada daqui some; do arquivo entra o que não existe aqui
+  // (lançamento com o mesmo id: fica a versão editada por último)
+  function juntarListas(a, b) {
+    if (!(a && a.length)) return b ? [...b] : [];
+    const ids = new Set(a.map((x) => x && x.id));
+    return [...a, ...(b || []).filter((x) => x && x.id && !ids.has(x.id))];
+  }
+  function juntarBackup(novo) {
+    // Plin vazio (ex.: celular novo): juntar é o mesmo que trocar, pra não misturar as categorias padrão com as suas
+    if (!all().length) return { cfg: novo.cfg, meses: novo.meses, novos: Object.values(novo.meses).flat().length, mudou: true };
+    const m = {}; let novos = 0, mudou = false;
+    for (const ym of new Set([...Object.keys(meses), ...Object.keys(novo.meses)])) {
+      const por = new Map((meses[ym] || []).map((l) => [l.id, l]));
+      for (const l of novo.meses[ym] || []) {
+        const a = por.get(l.id);
+        if (!a) { por.set(l.id, l); novos++; } else if ((l.atualizadoEm || 0) > (a.atualizadoEm || 0)) { por.set(l.id, l); mudou = true; }
+      }
+      const ls = [...por.values()].sort((x, y) => x.data.localeCompare(y.data));
+      if (ls.length) m[ym] = ls;
+    }
+    const nc = novo.cfg || {};
+    const c = Object.assign({}, nc, cfg);
+    c.categorias = { gasto: juntarListas(cfg.categorias.gasto, (nc.categorias || {}).gasto), entrada: juntarListas(cfg.categorias.entrada, (nc.categorias || {}).entrada) };
+    for (const k of ['caixinhas', 'planejados', 'recorrentes', 'lembretes', 'aportesFixos', 'cdi']) if (Array.isArray(cfg[k]) || Array.isArray(nc[k])) c[k] = juntarListas(cfg[k], nc[k]);
+    if (cfg.planosMes || nc.planosMes) c.planosMes = Object.assign({}, nc.planosMes || {}, cfg.planosMes || {});
+    if (cfg.fechados || nc.fechados) c.fechados = [...new Set([...(nc.fechados || []), ...(cfg.fechados || [])])].sort().slice(-24);
+    const tam = (o) => ['caixinhas', 'planejados', 'recorrentes', 'lembretes', 'aportesFixos', 'cdi'].reduce((t, k) => t + ((o[k] || []).length), (o.categorias.gasto || []).length + (o.categorias.entrada || []).length + Object.keys(o.planosMes || {}).length);
+    if (tam(c) !== tam(cfg)) mudou = true;
+    return { cfg: Object.assign(CFG0(), c), meses: m, novos, mudou };
+  }
   function backupObj() { return { app: 'plin', versao: 2, exportadoEm: new Date().toISOString(), config: cfg, meses }; }
   function deBackup(b) {
     // aceita o formato novo (versao 2) e o do primeiro Plin (valores em reais, tipos despesa/receita)
@@ -2327,6 +2377,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     render(); await salvarCfg(); toast('Divisão salva.');
   });
   $('ex-bkp').addEventListener('click', salvarBackup);
+  $('ex-mandar').hidden = !podeMandar();
+  $('ex-mandar').addEventListener('click', mandarBackup);
   $('ex-csv').addEventListener('click', () => oferecerArquivo(`plin-${todayISO()}.csv`, csv()));
   $('im-bkp').addEventListener('change', async (e) => {
     const f = e.target.files && e.target.files[0]; e.target.value = '';
@@ -2334,17 +2386,19 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     let novo;
     try { novo = deBackup(JSON.parse(await f.text())); } catch (err) { toast(err.message || 'Arquivo inválido.'); return; }
     const n = Object.values(novo.meses).flat().length;
+    const j = juntarBackup(novo);
     const body = h('div', { class: 'stack', style: 'gap:12px' },
-      h('p', { class: 'sub' }, `O arquivo tem ${n} lançamentos, ${novo.cfg.caixinhas.length} caixinhas e ${novo.cfg.planejados.length} gastos planejados. Importar troca tudo o que está no Plin agora (${all().length} lançamentos) pelo conteúdo do arquivo.`),
-      h('div', { class: 'row-btns' }, dangerBtn('Trocar pelos dados do arquivo', async () => {
+      h('p', { class: 'sub' }, `O arquivo tem ${n} lançamentos, ${novo.cfg.caixinhas.length} caixinhas e ${novo.cfg.planejados.length} gastos planejados. O Plin tem ${all().length} lançamentos agora.`),
+      h('p', { class: 'sub' }, j.novos ? `Juntar acrescenta os ${j.novos} lançamentos que só estão no arquivo e mantém tudo o que você já tem aqui.` : j.mudou ? 'Os lançamentos do arquivo já estão no Plin. Juntar só acrescenta o que falta de caixinhas, categorias ou planos.' : 'Tudo o que está no arquivo já está no Plin, então juntar não muda nada.'),
+      h('div', { class: 'row-btns' }, h('button', { class: 'btn', type: 'button', style: 'flex:1', onclick: async () => {
         sh.close();
-        const antigos = Object.keys(meses);
-        const agora = Date.now();
-        const pares = [['plin/config', Object.assign({}, novo.cfg, { atualizadoEm: agora })],
-          ...[...new Set([...antigos, ...Object.keys(novo.meses)])].map((ym) => ['meses/' + ym, { itens: novo.meses[ym] || [], atualizadoEm: agora }])];
-        try { await store.gravarVarios(pares); } catch (e) { toast('Não consegui importar. Nada foi mudado.'); return; }
-        cfg = novo.cfg; meses = novo.meses; render();
-        toast('Backup importado.');
+        if (!j.novos && !j.mudou) { toast('Nada novo no arquivo.'); return; }
+        if (await gravarImport(j)) toast(!j.novos ? 'Juntei o que faltava (caixinhas, categorias ou planos).' : j.novos === 1 ? 'Juntei 1 lançamento.' : `Juntei ${j.novos} lançamentos.`);
+      } }, 'Juntar com o que já tem')),
+      h('p', { class: 'sub' }, 'Trocar apaga o que está no Plin agora e põe só o que está no arquivo.'),
+      h('div', { class: 'row-btns' }, dangerBtn('Trocar tudo pelo arquivo', async () => {
+        sh.close();
+        if (await gravarImport(novo)) toast('Backup importado.');
       })));
     const sh = sheet('Importar backup', body);
   });
