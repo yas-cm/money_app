@@ -1566,14 +1566,21 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     if (!ord.length || !(tot > 0)) { box.hidden = true; return; }
     box.hidden = false;
     let fatias = ord.map(([id, v]) => ({ id, v, c: catById('gasto', id) }));
-    if (fatias.length > 7) { const resto = fatias.slice(6); fatias = [...fatias.slice(0, 6), { id: null, v: resto.reduce((a, x) => a + x.v, 0), c: { nome: `Outras (${resto.length})`, cor: '#9a93b8' } }]; }
+    let resto = [];
+    if (fatias.length > 7) { resto = fatias.slice(6); fatias = [...fatias.slice(0, 6), { id: null, outras: true, v: resto.reduce((a, x) => a + x.v, 0), c: { nome: `Outras (${resto.length})`, cor: '#9a93b8' } }]; }
+    const naOutras = !!catSel && resto.some((x) => x.id === catSel);
+    // "Outras": toque abre a lista do que tem dentro; escolher uma categoria lá marca ela nos gráficos
+    const abrirOutras = () => {
+      const sh = sheet('Outras categorias', h('div', { class: 'stack', style: 'gap:6px' }, h('p', { class: 'sub' }, `Juntas são ${brl(resto.reduce((a, x) => a + x.v, 0))}. Toque numa pra ver ela nos gráficos.`),
+        resto.map((x) => h('button', { class: 'en', type: 'button', onclick: () => { sh.close(); catSel = x.id; barSel = null; renderGraficos(); } }, h('span', { class: 't' }, h('span', { class: 'tag' }, marca(x.c), x.c.nome)), h('span', { class: 'v' }, brl(x.v)), h('span', { class: 'meta' }, Math.round(x.v / tot * 100) + '% do total')))));
+    };
     const S = 160, cx = S / 2, R = 76, r = 48;
     const svg = sv('svg', { viewBox: `0 0 ${S} ${S}`, role: 'img', 'aria-label': 'Pizza dos gastos por categoria' });
     const pt = (a, rad) => [cx + rad * Math.sin(a), cx - rad * Math.cos(a)];
     let a0 = 0;
     for (const f of fatias) {
       const frac = f.v / tot, a1 = a0 + frac * Math.PI * 2;
-      const dim = catSel && f.id !== catSel;
+      const dim = catSel && f.id !== catSel && !(f.outras && naOutras);
       const attrs = { fill: f.c.cor, opacity: dim ? .3 : 1, stroke: 'var(--panel)', 'stroke-width': 2, 'stroke-linejoin': 'round' };
       let el;
       if (frac >= .9999) el = sv('path', Object.assign({ d: `M${cx},${cx - R}A${R},${R} 0 1 1 ${cx - .01},${cx - R}Z M${cx},${cx - r}A${r},${r} 0 1 0 ${cx + .01},${cx - r}Z`, 'fill-rule': 'evenodd' }, attrs));
@@ -1584,13 +1591,14 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       }
       el.append(sv('title', {}, `${f.c.nome}: ${brl(f.v)} (${Math.round(frac * 100)}%)`));
       if (f.id) el.addEventListener('click', () => { catSel = catSel === f.id ? null : f.id; barSel = null; renderGraficos(); });
+      else if (f.outras) el.addEventListener('click', abrirOutras);
       svg.append(el);
       a0 = a1;
     }
-    const foco = catSel ? fatias.find((f) => f.id === catSel) : null;
+    const foco = catSel ? (fatias.find((f) => f.id === catSel) || resto.find((f) => f.id === catSel)) : null;
     svg.append(sv('text', { x: cx, y: cx - 4, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)' }, foco ? Math.round(foco.v / tot * 100) + '%' : brl(tot).replace('R$', '').trim()));
     svg.append(sv('text', { x: cx, y: cx + 13, 'text-anchor': 'middle', 'font-size': 9.5, fill: 'var(--muted)', 'font-weight': 600 }, foco ? (foco.c.nome.length > 14 ? foco.c.nome.slice(0, 13) + '…' : foco.c.nome) : 'reais gastos'));
-    const leg = h('div', { class: 'leg' }, fatias.map((f) => h('button', { type: 'button', 'aria-pressed': String(!!f.id && catSel === f.id), disabled: !f.id, onclick: () => { if (!f.id) return; catSel = catSel === f.id ? null : f.id; barSel = null; renderGraficos(); } },
+    const leg = h('div', { class: 'leg' }, fatias.map((f) => h('button', { type: 'button', 'aria-pressed': String((!!f.id && catSel === f.id) || (!!f.outras && naOutras)), onclick: () => { if (f.outras) { abrirOutras(); return; } catSel = catSel === f.id ? null : f.id; barSel = null; renderGraficos(); } },
       h('i', { style: `background:${f.c.cor}` }), h('span', null, f.c.nome), h('small', null, Math.round(f.v / tot * 100) + '%'))));
     box.replaceChildren(svg, leg);
   }
