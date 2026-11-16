@@ -179,8 +179,7 @@ svg.ic { width: 17px; height: 17px; flex: none; display: inline-block; }
 .sem .tr i { display: block; height: 100%; background: var(--tang); border-radius: 4px; }
 .sem.agora span:first-child { font-weight: 700; }
 .sem b { font-size: .84rem; }
-#gr-per .chip.sv { margin-left: auto; border-style: dashed; }
-#gr-per .chip.sv[aria-pressed="true"] { border-style: solid; }
+.sv-opt { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .modo-orc { justify-content: center; }
 .modo-orc .chip { padding: 4px 12px; font-size: .78rem; }
 .swatch { width: 30px; height: 30px; border-radius: 9px; border: 2px solid transparent; }
@@ -445,7 +444,6 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       <button class="chip" type="button" data-p="3">3 meses</button>
       <button class="chip" type="button" data-p="12">12 meses</button>
       <button class="chip" type="button" data-p="0">Tudo</button>
-      <button class="chip sv" type="button" id="gr-sv" aria-pressed="false" hidden>Sem viagem</button>
     </div>
     <div class="kpis" id="gr-kpis"></div>
     <div class="panel">
@@ -459,6 +457,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       <p class="sub" id="gr-mes-sub">—</p>
       <div class="chart" id="gr-mes"></div>
       <div class="readout" id="gr-read"></div>
+      <label class="opt sv-opt" id="gr-sv-w" hidden><input type="checkbox" id="gr-sv"> <span>Sem viagem<small>Tira a categoria Viagem das médias e de todos os gráficos.</small></span></label>
     </div>
     <div class="panel">
       <h2 id="gr-top-t">Maiores gastos do período</h2>
@@ -1468,8 +1467,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   function renderGraficos() {
     for (const b of $('gr-per').querySelectorAll('button[data-p]')) b.setAttribute('aria-pressed', String(Number(b.dataset.p) === per));
-    $('gr-sv').hidden = !temViagem(); if (!temViagem()) semViagem = false;
-    $('gr-sv').setAttribute('aria-pressed', String(semViagem));
+    $('gr-sv-w').hidden = !temViagem(); if (!temViagem()) semViagem = false;
+    $('gr-sv').checked = semViagem;
     if (semViagem && catSel && ehViagem(catSel)) catSel = null;
     if (!carregou) return;
     const ms = mesesDoPeriodo();
@@ -2638,7 +2637,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   $('rc-new').addEventListener('click', () => openRec());
   $('af-new').addEventListener('click', () => openAporte());
   $('cg-new').addEventListener('click', () => openCat(catTab));
-  $('gr-sv').addEventListener('click', (e) => { e.stopPropagation(); semViagem = !semViagem; lsSet('plin-sem-viagem', semViagem ? '1' : '0'); barSel = null; renderGraficos(); toast(semViagem ? 'Gráficos sem as viagens.' : 'Gráficos com tudo de novo.'); });
+  $('gr-sv').addEventListener('change', (e) => { semViagem = e.target.checked; lsSet('plin-sem-viagem', semViagem ? '1' : '0'); barSel = null; renderGraficos(); toast(semViagem ? 'Gráficos sem as viagens.' : 'Gráficos com tudo de novo.'); });
   $('gr-per').addEventListener('click', (e) => { const b = e.target.closest('button[data-p]'); if (b) { per = Number(b.dataset.p); barSel = null; renderGraficos(); } });
   $('gr-limpar').addEventListener('click', () => { catSel = null; barSel = null; renderGraficos(); });
   $('cg-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { catTab = b.dataset.k; renderNumeros(); } });
