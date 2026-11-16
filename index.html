@@ -149,10 +149,12 @@ svg.ic { width: 17px; height: 17px; flex: none; display: inline-block; }
 .icones button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
 .icones .sem i { width: 12px; height: 12px; border-radius: 3px; display: block; }
 .cat-grade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.cat-grade .chip.cat { flex-direction: column; justify-content: flex-start; gap: 5px; border-radius: 14px; padding: 9px 3px 7px; font-size: .72rem; line-height: 1.15; text-align: center; min-width: 0; }
+.cat-grade .chip.cat { flex-direction: column; justify-content: flex-start; gap: 5px; border-radius: 14px; padding: 9px 2px 7px; font-size: .72rem; line-height: 1.15; text-align: center; min-width: 0; }
 .cat-grade .chip.cat svg.ic { width: 30px; height: 30px; margin: 0; }
 .cat-grade .chip.cat i { width: 22px; height: 22px; border-radius: 6px; margin: 4px 0; }
-.cat-grade .chip.cat span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; max-width: 100%; }
+.cat-grade .chip.cat span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: normal; word-break: normal; max-width: 100%; }
+.cat-grade .chip.cat span.l1 { font-size: .66rem; }
+.cat-grade .chip.cat span.l2 { font-size: .6rem; letter-spacing: -.02em; }
 .cat-grade .chip.cat[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 16%, var(--panel)); color: var(--ink); border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
 .modo-orc { justify-content: center; }
 .modo-orc .chip { padding: 4px 12px; font-size: .78rem; }
@@ -592,6 +594,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     return el;
   }
   // marca da categoria: o ícone na cor dela (ou o quadradinho colorido, se ela não tiver ícone)
+  // nome embaixo do ícone na grade do Anotar: palavra comprida ganha letra menor, pra não quebrar no meio
+  function nomeCat(n) { const m = Math.max(...String(n).split(/\s+/).map((w) => w.length)); return h('span', { class: m >= 13 ? 'l2' : m >= 10 ? 'l1' : null }, n); }
   function marca(c) { const k = iconeDe(c); return k ? svgIcone(k, c.cor) : h('i', { style: `background:${c.cor}` }); }
   const PALETA = ['#f2662e', '#17a387', '#5b6cf0', '#e2a623', '#c2459a', '#2f8fd8', '#8a5cd6', '#e0514f', '#4fae4a', '#d97a1e', '#2bb5c8', '#9c7b55', '#6b7891', '#d4588a', '#7a9e2f', '#3c5bd1'];
   const GRUPOS = {
@@ -2012,7 +2016,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       cats.replaceChildren(); extra.replaceChildren();
       if (st.tipo === 'gasto' || st.tipo === 'entrada') {
         cats.hidden = false;
-        cats.append(...catsPorUso(st.tipo, uso, st.cat).map((c) => h('button', { class: 'chip cat', style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(st.cat === c.id), onclick: () => { st.cat = c.id; catManual = true; paint(); } }, marca(c), h('span', null, c.nome))));
+        cats.append(...catsPorUso(st.tipo, uso, st.cat).map((c) => h('button', { class: 'chip cat', style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(st.cat === c.id), onclick: () => { st.cat = c.id; catManual = true; paint(); } }, marca(c), nomeCat(c.nome))));
         if (st.tipo === 'gasto') {
           if (!edit) {
             const ps = h('select', { id: 'l-parc', onchange: (e) => { st.parcelas = Number(e.target.value); paintParc(); } }, Array.from({ length: 12 }, (_, i) => h('option', { value: i + 1 }, i === 0 ? 'À vista' : `${i + 1}x`)));
@@ -2213,7 +2217,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     let cat = (p && p.cat) || '';
     let catManual = !!cat;
     const cats = h('div', { class: 'chips cat-grade' });
-    const paintCats = () => cats.replaceChildren(...catsPorUso('gasto', uso, cat).map((c) => h('button', { class: 'chip cat', style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(cat === c.id), onclick: () => { cat = cat === c.id ? '' : c.id; catManual = true; paintCats(); } }, marca(c), h('span', null, c.nome))));
+    const paintCats = () => cats.replaceChildren(...catsPorUso('gasto', uso, cat).map((c) => h('button', { class: 'chip cat', style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(cat === c.id), onclick: () => { cat = cat === c.id ? '' : c.id; catManual = true; paintCats(); } }, marca(c), nomeCat(c.nome))));
     paintCats();
     desc.addEventListener('input', () => {
       if (catManual) return;
