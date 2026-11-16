@@ -136,6 +136,20 @@ button { cursor: pointer; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: .84rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.opt { display: flex; gap: 10px; align-items: flex-start; font-weight: 600; }
+.opt input { margin-top: 3px; width: 18px; height: 18px; flex: none; accent-color: var(--tang); }
+.opt small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; margin-top: 2px; }
+.es .en { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+svg.ic { width: 14px; height: 14px; flex: none; display: inline-block; }
+.chip svg.ic { width: 18px; height: 18px; margin-left: -3px; }
+.teto .t svg.ic { width: 15px; height: 15px; vertical-align: -3px; margin-right: 4px; }
+.icones { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+.icones button { aspect-ratio: 1; border: 1px solid var(--line); background: var(--panel); border-radius: 12px; display: grid; place-items: center; padding: 0; }
+.icones button svg.ic { width: 24px; height: 24px; }
+.icones button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.icones .sem i { width: 12px; height: 12px; border-radius: 3px; display: block; }
+.modo-orc { justify-content: center; }
+.modo-orc .chip { padding: 4px 12px; font-size: .78rem; }
 .swatch { width: 30px; height: 30px; border-radius: 9px; border: 2px solid transparent; }
 .swatch[aria-pressed="true"] { border-color: var(--ink); }
 .kinds { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
@@ -429,6 +443,10 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       <div class="row-btns"><button class="btn alt" type="button" id="cg-new">Nova categoria</button></div>
     </div>
     <div class="panel">
+      <h2>Neste aparelho</h2>
+      <label class="opt"><input type="checkbox" id="op-oculto"> <span>Abrir com os valores escondidos<small>O Plin sempre abre com R$ •••••. Toque no olhinho do topo pra ver.</small></span></label>
+    </div>
+    <div class="panel">
       <h2>Exportar e backup</h2>
       <p class="sub">A planilha (.csv) abre no Excel. O backup guarda tudo e serve para restaurar ou levar para outro aparelho. Seus dados ficam só neste navegador, então salve um backup de vez em quando.</p>
       <div class="row-btns">
@@ -450,7 +468,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.17.1';
+  const VERSAO = '2.18.0';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -461,7 +479,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   const brlF = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
   // Modo "ocultar valores" (o olhinho no topo): troca todo valor em R$ por pontinhos. A escolha fica salva no aparelho.
   let oculto = false;
-  try { oculto = localStorage.getItem('plin-ocultar') === '1'; } catch (e) { /* ok */ }
+  try { oculto = localStorage.getItem('plin-ocultar') === '1' || localStorage.getItem('plin-abrir-oculto') === '1'; } catch (e) { /* ok */ }
   const MASCARA = 'R$ •••••';
   const brlReal = (c) => brlF.format((Number(c) || 0) / 100);
   const brl = (c) => oculto ? MASCARA : brlReal(c);
@@ -507,6 +525,68 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, ms || (acao ? 6000 : 2400));
   }
 
+  // ícones de linha (vazados) das categorias: desenhados pro Plin, 24x24, traço na cor da categoria
+  const ICONES = {
+    talher: ['Comida', '<path d="M7 3v5a2 2 0 0 0 4 0V3M9 3v5M9 10v11"/><path d="M17 21V3a4 4 0 0 0-3 4v6h3"/>'],
+    xicara: ['Café e lanche', '<path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M9 3.5c-.6.8-.6 1.7 0 2.5M12.5 3.5c-.6.8-.6 1.7 0 2.5"/>'],
+    carrinho: ['Mercado', '<path d="M3 4h2.5l2.2 10.2a1 1 0 0 0 1 .8h8.6a1 1 0 0 0 1-.8L20 8H6.3"/><circle cx="9.5" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/>'],
+    sacola: ['Compras', '<path d="M5 8h14l-1 12H6z"/><path d="M9 10V6a3 3 0 0 1 6 0v4"/>'],
+    onibus: ['Ônibus', '<rect x="5" y="3" width="14" height="15" rx="3"/><path d="M5 11h14M8 6.5h8M8 18v2.5M16 18v2.5M9 14.5h.01M15 14.5h.01"/>'],
+    carro: ['Carro', '<path d="M5 12l1.8-4.5A2 2 0 0 1 8.7 6h6.6a2 2 0 0 1 1.9 1.5L19 12"/><rect x="3.5" y="12" width="17" height="5" rx="1.5"/><path d="M6.5 17v2M17.5 17v2M7 14.5h.01M17 14.5h.01"/>'],
+    aviao: ['Viagem', '<path d="M12 3c.8 0 1.5.7 1.5 1.5V9l7 4.5v2l-7-2.2V18l2 1.5V21L12 20l-3.5 1v-1.5l2-1.5v-4.7l-7 2.2v-2L10.5 9V4.5C10.5 3.7 11.2 3 12 3z"/>'],
+    casa: ['Casa', '<path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/>'],
+    recibo: ['Contas', '<path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21z"/><path d="M9 8h6M9 12h6M9 16h3"/>'],
+    repetir: ['Assinatura', '<path d="M4.5 11a7.5 7.5 0 0 1 13-4.3L19.5 9"/><path d="M19.5 4.5V9H15"/><path d="M19.5 13a7.5 7.5 0 0 1-13 4.3L4.5 15"/><path d="M4.5 19.5V15H9"/>'],
+    pilula: ['Saúde', '<rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-45 12 12)"/><path d="M9.5 9.5l5 5"/>'],
+    haltere: ['Academia', '<path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/>'],
+    bola: ['Esporte', '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6a9 9 0 0 1 0 12.8M18.4 5.6a9 9 0 0 0 0 12.8"/>'],
+    brilho: ['Beleza', '<path d="M11 3l1.8 5.2L18 10l-5.2 1.8L11 17l-1.8-5.2L4 10l5.2-1.8z"/><path d="M18 15l.7 1.8 1.8.7-1.8.7L18 20l-.7-1.8-1.8-.7 1.8-.7z"/>'],
+    camiseta: ['Roupas', '<path d="M8.5 4L4 6.5l1.8 4L8 9.5V20h8V9.5l2.2 1 1.8-4L15.5 4a3.5 3.5 0 0 1-7 0z"/>'],
+    celular: ['Eletrônicos', '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 17.5h2"/>'],
+    controle: ['Jogos', '<path d="M7 8h10a4 4 0 0 1 4 4.5l-.6 3.6a2 2 0 0 1-3.5 1L15 15H9l-1.9 2.1a2 2 0 0 1-3.5-1L3 12.5A4 4 0 0 1 7 8z"/><path d="M8 10.5v3.5M6.25 12.25h3.5M15.5 11.5h.01M17.5 13.5h.01"/>'],
+    cartas: ['Cartas', '<rect x="3.5" y="6.5" width="9.5" height="13.5" rx="1.8" transform="rotate(-10 8.25 13.25)"/><path d="M13.5 4.3l5.7.9a1.8 1.8 0 0 1 1.5 2.1l-1.6 10.1a1.8 1.8 0 0 1-2.1 1.5l-2.5-.4"/>'],
+    ingresso: ['Passeio', '<path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z"/><path d="M14 7v2M14 11v2M14 15v2"/>'],
+    filme: ['Filme', '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M7.5 5v14M16.5 5v14M3.5 9.5h4M3.5 14.5h4M16.5 9.5h4M16.5 14.5h4"/>'],
+    musica: ['Música', '<path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>'],
+    pessoas: ['Amigos', '<circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.3a3 3 0 0 1 0 5.4M17 14a5.5 5.5 0 0 1 3.5 5"/>'],
+    coracao: ['Coração', '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'],
+    presente: ['Presente', '<rect x="4" y="9" width="16" height="4" rx="1"/><path d="M5.5 13v7h13v-7M12 9v11"/><path d="M12 9C11 6 7 5 7 7.5 7 9 12 9 12 9zM12 9c1-3 5-4 5-1.5C17 9 12 9 12 9z"/>'],
+    livro: ['Livro', '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v14H6.5A1.5 1.5 0 0 0 5 18.5z"/><path d="M5 18.5A1.5 1.5 0 0 0 6.5 20H19v-3"/><path d="M9 7h6"/>'],
+    capelo: ['Estudo', '<path d="M2.5 9L12 4.5 21.5 9 12 13.5z"/><path d="M6.5 11v4.5c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3V11"/><path d="M21.5 9v5"/>'],
+    pata: ['Pet', '<circle cx="6.5" cy="10.5" r="1.7"/><circle cx="10" cy="6.5" r="1.7"/><circle cx="14" cy="6.5" r="1.7"/><circle cx="17.5" cy="10.5" r="1.7"/><path d="M12 12c-3 0-5.5 3.5-5.5 5.5 0 1.5 1.2 2.5 2.6 2.5 1.1 0 1.9-.6 2.9-.6s1.8.6 2.9.6c1.4 0 2.6-1 2.6-2.5 0-2-2.5-5.5-5.5-5.5z"/>'],
+    estrela: ['Estrela', '<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8L3.6 9.6l5.8-.8z"/>'],
+    maleta: ['Trabalho', '<rect x="3.5" y="7" width="17" height="12" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3.5 12.5h17"/>'],
+    carteira: ['Carteira', '<path d="M18.5 8V6.5A1.5 1.5 0 0 0 17 5H6.5A2.5 2.5 0 0 0 4 7.5v9A2.5 2.5 0 0 0 6.5 19h12a1.5 1.5 0 0 0 1.5-1.5V15"/><path d="M4 8h14.5A1.5 1.5 0 0 1 20 9.5V11"/><rect x="14.5" y="11" width="6.5" height="4" rx="1.5"/>'],
+    cartao: ['Cartão', '<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3 10h18M7 14.5h3"/>'],
+    trofeu: ['Prêmio', '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M10 17h4"/>'],
+    grafico: ['Rendimento', '<path d="M4 19h16"/><path d="M5 15l4.5-4.5 3.5 3L19.5 7"/><path d="M15 7h4.5v4.5"/>'],
+    moedas: ['Dinheiro', '<ellipse cx="9" cy="7" rx="5" ry="2.5"/><path d="M4 7v4c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5V7"/><path d="M10 13.5v3c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-4c0-1.4-2.2-2.5-5-2.5"/><path d="M14 13.5c.3 0 .7.5 1 .5 2.8 0 5-1.1 5-2.5"/>'],
+    voltar: ['Reembolso', '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'],
+    mais: ['Extra', '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'],
+    etiqueta: ['Etiqueta', '<path d="M3.5 12.5v-8a1 1 0 0 1 1-1h8l8 8-9 9z"/><circle cx="8" cy="8" r="1.4"/>'],
+    pontos: ['Outros', '<circle cx="12" cy="12" r="9"/><path d="M8 12h.01M12 12h.01M16 12h.01"/>'],
+  };
+  // ícone inicial de cada categoria (quem não escolheu nenhum): pelo id e, se não achar, por palavras do nome
+  const ICONE_ID = { mercado: 'carrinho', comida: 'talher', transporte: 'onibus', casa: 'casa', lar: 'casa', contas: 'recibo', saude: 'pilula', lazer: 'ingresso', entretenimento: 'controle', compras: 'sacola', educacao: 'capelo', presentes: 'presente', assinaturas: 'repetir', viagem: 'aviao', outros: 'pontos', beleza: 'brilho', esportes: 'bola', social: 'pessoas', roupas: 'camiseta', eletronicos: 'celular', pets: 'pata', lanches: 'xicara', academia: 'haltere', tcg: 'cartas', salario: 'maleta', adiantamento: 'carteira', vale: 'cartao', monitoria: 'livro', plr: 'trofeu', investimentos_r: 'grafico', existente: 'moedas', outros_r: 'pontos', extra: 'mais', reembolso: 'voltar', presente: 'presente', outras: 'pontos' };
+  const ICONE_PALAVRA = [[/mercad|feira/, 'carrinho'], [/comid|restaur|almo|janta|ifood/, 'talher'], [/lanche|cafe|padaria/, 'xicara'], [/uber|transp|onibus|metro/, 'onibus'], [/carro|gasolin|combust/, 'carro'], [/viage|passag/, 'aviao'], [/casa|aluguel|lar\b/, 'casa'], [/conta|luz|agua|internet/, 'recibo'], [/assina|stream/, 'repetir'], [/saude|farmac|remed|medic/, 'pilula'], [/academ|gym/, 'haltere'], [/esport/, 'bola'], [/beleza|cabel|unha/, 'brilho'], [/roupa/, 'camiseta'], [/eletron|celular/, 'celular'], [/jogo|game/, 'controle'], [/carta|tcg/, 'cartas'], [/lazer|passeio|show/, 'ingresso'], [/cinema|filme/, 'filme'], [/musica/, 'musica'], [/social|amig|festa/, 'pessoas'], [/presente/, 'presente'], [/curso|educa|estud|faculd/, 'capelo'], [/livro|monitor/, 'livro'], [/pet|cachorr|gato/, 'pata'], [/salario|estagio|trabalho/, 'maleta'], [/vale/, 'cartao'], [/rend|invest|juros/, 'grafico'], [/reembols|devol/, 'voltar'], [/extra|bico|freela/, 'mais'], [/outr/, 'pontos']];
+  const semAcento = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  function iconeDe(c) {
+    if (!c) return 'etiqueta';
+    if (c.icone === '-') return '';
+    if (c.icone && ICONES[c.icone]) return c.icone;
+    if (ICONE_ID[c.id]) return ICONE_ID[c.id];
+    const n = semAcento(c.nome); const m = ICONE_PALAVRA.find(([re]) => re.test(n));
+    return m ? m[1] : 'etiqueta';
+  }
+  function svgIcone(k, cor) {
+    const el = document.createElementNS(NS, 'svg');
+    el.setAttribute('viewBox', '0 0 24 24'); el.setAttribute('aria-hidden', 'true'); el.setAttribute('class', 'ic');
+    el.setAttribute('fill', 'none'); el.setAttribute('stroke', cor || 'currentColor'); el.setAttribute('stroke-width', '1.8'); el.setAttribute('stroke-linecap', 'round'); el.setAttribute('stroke-linejoin', 'round');
+    el.innerHTML = (ICONES[k] || ICONES.etiqueta)[1];
+    return el;
+  }
+  // marca da categoria: o ícone na cor dela (ou o quadradinho colorido, se ela não tiver ícone)
+  function marca(c) { const k = iconeDe(c); return k ? svgIcone(k, c.cor) : h('i', { style: `background:${c.cor}` }); }
   const PALETA = ['#f2662e', '#17a387', '#5b6cf0', '#e2a623', '#c2459a', '#2f8fd8', '#8a5cd6', '#e0514f', '#4fae4a', '#d97a1e', '#2bb5c8', '#9c7b55', '#6b7891', '#d4588a', '#7a9e2f', '#3c5bd1'];
   const GRUPOS = {
     livre: { nome: 'Emergência', cor: '#17a387' },
@@ -839,11 +919,71 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       const porDia = Math.floor(livreDepois / dias);
       hojeEl.hidden = false;
       const conta = { meta, o, gastouAntes: d.gastou - gHoje, livreDepois, dias, porDia, ultimo, hoje, gHoje };
+      contaAtual = conta;
+      if (modoOrc() === 'semana') {
+        const sm = semanaDe(d, conta); conta.sm = sm;
+        hojeEl.replaceChildren(
+          h('button', { class: 'pdia', type: 'button', onclick: () => openConta(conta), 'aria-label': 'Ver a conta do pode gastar na semana' }, h('span', { class: 'label' }, 'Pode gastar na semana'), h('b', { class: 'big2 num' + (sm.resta < 0 ? ' neg' : '') }, sm.resta < 0 ? '− ' + brl(-sm.resta) : brl(sm.resta)), h('small', null, sm.resta < 0 ? `passou ${brl(-sm.resta)} da semana` : `de ${brl(sm.orc)}, até ${sm.fimTxt}`)),
+          h('button', { class: 'hj', type: 'button', onclick: () => openHoje(conta) }, h('span', { class: 'label' }, 'Hoje'), h('b', { class: 'big2 num' + (sm.resta < 0 && gHoje > 0 ? ' neg' : '') }, brl(gHoje)), h('small', null, gHoje === 0 ? 'nada ainda' : sm.resta < 0 ? 'passou da semana' : 'cabe na semana')));
+      } else
       hojeEl.replaceChildren(
-        h('button', { class: 'pdia', type: 'button', onclick: () => openContaDia(conta), 'aria-label': 'Ver a conta do pode gastar por dia' }, h('span', { class: 'label' }, 'Pode gastar por dia'), h('b', { class: 'big2 num' + (porDia < 0 ? ' neg' : '') }, porDia > 0 ? brl(porDia) : (oculto ? MASCARA : 'R$ 0')), h('small', null, `até dia ${ultimo}` + (o.pendente ? `, já guardando ${brl(o.pendente)} pros planejados e fixos` : ''))),
+        h('button', { class: 'pdia', type: 'button', onclick: () => openConta(conta), 'aria-label': 'Ver a conta do pode gastar por dia' }, h('span', { class: 'label' }, 'Pode gastar por dia'), h('b', { class: 'big2 num' + (porDia < 0 ? ' neg' : '') }, porDia > 0 ? brl(porDia) : (oculto ? MASCARA : 'R$ 0')), h('small', null, `até dia ${ultimo}` + (o.pendente ? `, já guardando ${brl(o.pendente)} pros planejados e fixos` : ''))),
         h('button', { class: 'hj', type: 'button', onclick: () => openHoje(conta) }, h('span', { class: 'label' }, 'Hoje'), h('b', { class: 'big2 num' + (porDia > 0 && gHoje > porDia ? ' neg' : '') }, brl(gHoje)), h('small', null, gHoje === 0 ? 'nada ainda' : porDia > 0 && gHoje > porDia ? `passou ${brl(gHoje - porDia)}` : `sobra ${brl(Math.max(0, porDia - gHoje))}`)));
     } else hojeEl.hidden = true;
     renderMesResto(d);
+  }
+  // orçamento por dia ou por semana (a troca fica escondida dentro da conta). Fica salvo neste aparelho.
+  let contaAtual = null;
+  const modoOrc = () => (lsGet('plin-orc-modo') === 'semana' ? 'semana' : 'dia');
+  function trocarModo(m) { lsSet('plin-orc-modo', m); renderMes(); if (contaAtual) openConta(contaAtual); }
+  const openConta = (c) => (modoOrc() === 'semana' && c.sm ? openContaSemana(c) : openContaDia(c));
+  const difDias = (a, b) => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
+  // semana de segunda a domingo; a semana que cruza a virada do mês conta só os dias deste mês.
+  // O valor da semana = (Livre - gastos fora desta semana - planejados e fixos não pagos) dividido pelos dias que faltam, vezes os dias da semana.
+  function semanaDe(d, c) {
+    const { hoje, meta, o, ultimo } = c;
+    const w = (new Date(hoje + 'T00:00:00Z').getUTCDay() + 6) % 7; // 0 = segunda
+    const mesIni = hoje.slice(0, 8) + '01', mesFim = hoje.slice(0, 8) + String(ultimo).padStart(2, '0');
+    let ini = addDia(hoje, -w); if (ini < mesIni) ini = mesIni;
+    let fim = addDia(hoje, 6 - w); if (fim > mesFim) fim = mesFim;
+    const dentro = (l) => l.data >= ini && l.data <= fim;
+    const gs = d.ls.filter((l) => l.tipo === 'gasto' && !l.origem);
+    const gasto = gs.filter((l) => dentro(l) && !l.pj).reduce((a, l) => a + l.valor, 0);
+    const antes = gs.filter((l) => l.data < ini).reduce((a, l) => a + l.valor, 0);
+    const depois = gs.filter((l) => l.data > fim).reduce((a, l) => a + l.valor, 0);
+    const pjSem = gs.filter((l) => dentro(l) && l.pj).reduce((a, l) => a + l.valor, 0);
+    const base = meta - antes - depois - pjSem - o.pendente;
+    const diasSem = difDias(ini, fim) + 1, diasRest = difDias(ini, mesFim) + 1;
+    const orc = Math.max(0, Math.floor(base * diasSem / diasRest));
+    const domingo = new Date(fim + 'T00:00:00Z').getUTCDay() === 0;
+    return { ini, fim, gasto, antes, depois, pjSem, base, diasSem, diasRest, orc, resta: orc - gasto, fimTxt: domingo ? `domingo (${dmCurto(fim)})` : `dia ${Number(fim.slice(8, 10))}` };
+  }
+  function trocaModoEl() {
+    const m = modoOrc();
+    return h('div', { class: 'chips modo-orc' }, [['dia', 'Por dia'], ['semana', 'Por semana']].map(([k, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(m === k), onclick: () => { if (m !== k) trocarModo(k); } }, t)));
+  }
+  function openContaSemana(c) {
+    const { o, sm } = c;
+    const linha = (t, v, sinal, cls) => h('div', { class: cls || '' }, h('span', null, (sinal ? sinal + ' ' : '') + t), h('span', { class: 'lead' }), h('b', { class: 'num' + (v < 0 ? ' neg' : '') }, v < 0 ? '− ' + brl(-v) : brl(v)));
+    const sub = (t, v, sinal) => h('div', { class: 'sub2' }, h('span', null, (sinal ? sinal + ' ' : '') + t), h('span', { class: 'lead' }), h('span', { class: 'num' }, brl(v)));
+    const per = sm.ini === sm.fim ? dmCurto(sm.ini) : `${dmCurto(sm.ini)} a ${dmCurto(sm.fim)}`;
+    const body = h('div', { class: 'stack conta', style: 'gap:14px' }, trocaModoEl(),
+      h('div', { class: 'ledger' },
+        linha('Livre do mês', c.meta),
+        ...(o.partes || []).map(([t, v, s]) => sub(t, v, s)),
+        sm.antes ? linha('Gastos antes desta semana', sm.antes, '−') : null,
+        sm.depois ? linha('Gastos já anotados pra depois', sm.depois, '−') : null,
+        sm.pjSem ? linha('Planejados pagos nesta semana', sm.pjSem, '−') : null,
+        o.pendente ? linha('Planejados e fixos ainda não pagos', o.pendente, '−') : null,
+        ...(o.pendItens || []).map((x) => sub(x.t + ' (' + x.q + ')', x.v)),
+        linha(`Sobra pra semana e o resto do mês`, sm.base, '=', 'res'),
+        h('div', null, h('span', null, '× Dias desta semana ÷ dias que faltam'), h('span', { class: 'lead' }), h('b', { class: 'num' }, `${sm.diasSem} de ${sm.diasRest}`)),
+        h('div', { class: 'sub2' }, h('span', null, `semana: ${per}`)),
+        linha('Pode gastar na semana', sm.orc, '=', 'res'),
+        linha('Gastos desta semana', sm.gasto, '−'),
+        linha(sm.resta < 0 ? 'Passou da semana' : 'Ainda dá pra gastar', sm.resta, '=', 'res')),
+      h('p', { class: 'sub' }, 'Dá pra gastar pouco num dia e mais em outro (no domingo, por exemplo): o que conta é a semana toda. A semana vai de segunda a domingo; na virada do mês, cada mês conta só os seus dias. Gastos que saíram de caixinha não contam, e pagamento planejado já estava separado.'));
+    sheet('A conta da semana', body);
   }
   // a conta do "pode gastar por dia", passo a passo
   function openContaDia(c) {
@@ -851,7 +991,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const linha = (t, v, sinal, cls) => h('div', { class: cls || '' }, h('span', null, (sinal ? sinal + ' ' : '') + t), h('span', { class: 'lead' }), h('b', { class: 'num' + (v < 0 ? ' neg' : '') }, v < 0 ? '− ' + brl(-v) : brl(v)));
     const sub = (t, v, sinal) => h('div', { class: 'sub2' }, h('span', null, (sinal ? sinal + ' ' : '') + t), h('span', { class: 'lead' }), h('span', { class: 'num' }, brl(v)));
     const hojeN = Number(c.hoje.slice(8, 10));
-    const body = h('div', { class: 'stack conta', style: 'gap:14px' },
+    const body = h('div', { class: 'stack conta', style: 'gap:14px' }, trocaModoEl(),
       h('div', { class: 'ledger' },
         linha('Livre do mês', c.meta),
         ...(o.partes || []).map(([t, v, s]) => sub(t, v, s)),
@@ -966,7 +1106,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     $('teto').replaceChildren(...linhas.map(({ c, g }) => {
       const f = g / c.teto; const cls = f > 1 ? ' passou' : f >= 0.8 ? ' perto' : '';
       return h('button', { class: 'teto' + cls, type: 'button', onclick: () => openCat('gasto', c) },
-        h('span', { class: 't' }, h('i', { style: `background:${c.cor}` }), c.nome), h('span', { class: 'v' }, `${brl(g)} de ${brl(c.teto)}`),
+        h('span', { class: 't' }, marca(c), c.nome), h('span', { class: 'v' }, `${brl(g)} de ${brl(c.teto)}`),
         h('span', { class: 'track' }, h('i', { style: `width:${Math.min(100, f * 100)}%;background:${f > 1 ? 'var(--bad)' : f >= 0.8 ? 'var(--tang)' : c.cor}` })),
         h('small', null, f > 1 ? `passou ${brl(g - c.teto)}` : f >= 0.8 ? `perto do teto, sobram ${brl(c.teto - g)}` : `sobram ${brl(c.teto - g)}`));
     }));
@@ -1049,7 +1189,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     $('nm-p').hidden = !(pjs.length || lbs.length);
     $('nm').replaceChildren(
       ...lbs.map((l) => h('button', { class: 'en' + (l.feito ? ' done' : ''), type: 'button', onclick: () => openLembrete(l) }, h('span', { class: 't' }, l.texto), h('span', { class: 'v muted' }, l.data.split('-').reverse().slice(0, 2).join('/')), h('span', { class: 'meta' }, 'lembrete'))),
-      ...pjs.map((p) => h('button', { class: 'en' + (p.feito ? ' done' : ''), type: 'button', onclick: () => (p.feito ? openPlanejado(p) : pagarPlanejado(p)) }, h('span', { class: 't' }, p.desc), h('span', { class: 'v' }, brl(p.valor)), h('span', { class: 'meta' }, p.cat ? h('span', { class: 'tag' }, h('i', { style: `background:${catById('gasto', p.cat).cor}` }), catById('gasto', p.cat).nome) : null, 'planejado' + (p.sai ? ' · sai de ' + p.sai : '') + (p.feito ? ' · pago' : ' · toque para anotar o pagamento')))));
+      ...pjs.map((p) => h('button', { class: 'en' + (p.feito ? ' done' : ''), type: 'button', onclick: () => (p.feito ? openPlanejado(p) : pagarPlanejado(p)) }, h('span', { class: 't' }, p.desc), h('span', { class: 'v' }, brl(p.valor)), h('span', { class: 'meta' }, p.cat ? h('span', { class: 'tag' }, marca(catById('gasto', p.cat)), catById('gasto', p.cat).nome) : null, 'planejado' + (p.sai ? ' · sai de ' + p.sai : '') + (p.feito ? ' · pago' : ' · toque para anotar o pagamento')))));
 
     const box = $('lista'); box.replaceChildren();
     if (!d.ls.length) {
@@ -1070,7 +1210,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     if (l.tipo === 'gasto' || l.tipo === 'entrada') {
       const c = catById(l.tipo, l.cat);
       titulo = l.desc || c.nome;
-      tag = [h('span', { class: 'tag' }, h('i', { style: `background:${c.cor}` }), c.nome)];
+      tag = [h('span', { class: 'tag' }, marca(c), c.nome)];
       if (l.origem && cxById(l.origem)) tag.push(h('span', null, 'saiu da caixinha ' + cxById(l.origem).nome));
       valor = (l.tipo === 'gasto' ? '− ' : '+ ') + brl(l.valor); cls = l.tipo === 'entrada' ? 'pos' : '';
     } else if (l.tipo === 'transferir') {
@@ -1085,7 +1225,31 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       tag = [h('span', { class: 'tag' }, h('i', { style: `background:${cx ? GRUPOS[cx.grupo].cor : '#999'};border-radius:50%` }), (l.tipo === 'guardar' ? 'para ' : 'de ') + (cx ? cx.nome : 'caixinha removida'))];
       valor = brl(l.valor); cls = 'muted';
     }
-    return h('button', { class: 'en', type: 'button', onclick: () => openLanc(l) }, h('span', { class: 't' }, titulo), h('span', { class: 'v ' + cls }, valor), h('span', { class: 'meta' }, tag));
+    const b = h('button', { class: 'en', type: 'button', onclick: () => { if (segurou) { segurou = false; return; } openLanc(l); } }, h('span', { class: 't' }, titulo), h('span', { class: 'v ' + cls }, valor), h('span', { class: 'meta' }, tag));
+    segurar(b, () => anotarDeNovo(l));
+    return b;
+  }
+  // segurar o dedo (meio segundo) num lançamento abre o Anotar já preenchido com ele, pra anotar igual hoje
+  let segurou = false;
+  function segurar(el, fn) {
+    let t = null, x0 = 0, y0 = 0;
+    const parar = () => { clearTimeout(t); t = null; };
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      segurou = false; x0 = e.clientX; y0 = e.clientY; parar();
+      t = setTimeout(() => { t = null; segurou = true; try { navigator.vibrate && navigator.vibrate(15); } catch (_) {} fn(); }, 550);
+    });
+    el.addEventListener('pointermove', (e) => { if (t && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) parar(); });
+    el.addEventListener('pointerup', parar); el.addEventListener('pointercancel', parar); el.addEventListener('pointerleave', parar);
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  function anotarDeNovo(l) {
+    if (bloqueado()) return;
+    const n = { tipo: l.tipo, valor: l.parc ? l.parc.total : l.valor, desc: (l.desc || '').replace(/\s*\(\d+\/\d+\)$/, ''), data: todayISO(), novo: true };
+    for (const k of ['cat', 'origem', 'caixinha', 'para']) if (l[k]) n[k] = l[k];
+    if (l.parc) n.parcelas = l.parc.n;
+    openLanc(n);
+    toast('Anotar de novo: confira e toque em Anotar.');
   }
 
   function renderCaixinhas() {
@@ -1198,7 +1362,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     // gastos fixos
     const rcs = cfg.recorrentes || [];
     const totRc = rcs.filter((r) => r.ativo !== false).reduce((a, r) => a + r.valor, 0);
-    $('rc-list').replaceChildren(...(rcs.length ? [...rcs.map((r) => { const c = catById('gasto', r.cat); return h('button', { class: 'en' + (r.ativo === false ? ' done' : ''), type: 'button', onclick: () => openRec(r) }, h('span', { class: 't' }, r.desc), h('span', { class: 'v' }, brl(r.valor)), h('span', { class: 'meta' }, h('span', { class: 'tag' }, h('i', { style: `background:${c.cor}` }), c.nome), `dia ${r.dia || 1}` + (r.ate ? ` · até ${mShort(r.ate)}/${r.ate.slice(2, 4)}` : '') + (r.ativo === false ? ' · pausado' : ''))); }),
+    $('rc-list').replaceChildren(...(rcs.length ? [...rcs.map((r) => { const c = catById('gasto', r.cat); return h('button', { class: 'en' + (r.ativo === false ? ' done' : ''), type: 'button', onclick: () => openRec(r) }, h('span', { class: 't' }, r.desc), h('span', { class: 'v' }, brl(r.valor)), h('span', { class: 'meta' }, h('span', { class: 'tag' }, marca(c), c.nome), `dia ${r.dia || 1}` + (r.ate ? ` · até ${mShort(r.ate)}/${r.ate.slice(2, 4)}` : '') + (r.ativo === false ? ' · pausado' : ''))); }),
       h('p', { class: 'sub' }, `Total por mês: ${brl(totRc)}`)] : [h('div', { class: 'empty' }, 'Nenhum gasto fixo ainda. Ex.: streaming, academia, internet.')]));
     // lembretes
     const lbs = [...(cfg.lembretes || [])].sort((a, b) => a.data.localeCompare(b.data));
@@ -1234,7 +1398,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   function renderNumeros() {
     for (const b of $('cg-seg').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.k === catTab));
-    const chipCat = (c) => h('button', { class: 'chip' + (c.arquivada ? ' arq' : ''), type: 'button', onclick: () => openCat(catTab, c) }, h('i', { style: `background:${c.cor}` }), c.nome, c.teto > 0 ? h('small', { class: 'teto-tag' }, 'teto ' + brl(c.teto)) : null);
+    const chipCat = (c) => h('button', { class: 'chip' + (c.arquivada ? ' arq' : ''), type: 'button', onclick: () => openCat(catTab, c) }, marca(c), c.nome, c.teto > 0 ? h('small', { class: 'teto-tag' }, 'teto ' + brl(c.teto)) : null);
     const ativas = catsOf(catTab).filter((c) => !c.arquivada), arqs = catsOf(catTab).filter((c) => c.arquivada);
     $('cg-list').replaceChildren(...[...ativas.map(chipCat),
       arqs.length ? h('div', { class: 'label', style: 'width:100%;margin-top:8px' }, 'Arquivadas (não aparecem no Anotar)') : null, ...arqs.map(chipCat)].filter(Boolean));
@@ -1328,7 +1492,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     // maiores gastos do período (respeita a categoria escolhida)
     const top5 = gs.filter((l) => !catSel || l.cat === catSel).sort((a, b) => b.valor - a.valor).slice(0, 5);
     $('gr-top-t').textContent = c ? `Maiores gastos em ${c.nome}` : 'Maiores gastos do período';
-    $('gr-top').replaceChildren(...(top5.length ? top5.map((l) => { const cc = catById('gasto', l.cat); return h('button', { class: 'en', type: 'button', onclick: () => openLanc(l) }, h('span', { class: 't' }, l.desc || cc.nome), h('span', { class: 'v' }, brl(l.valor)), h('span', { class: 'meta' }, h('span', { class: 'tag' }, h('i', { style: `background:${cc.cor}` }), cc.nome), l.data.split('-').reverse().join('/'))); }) : [h('div', { class: 'empty' }, 'Nada no período.')]));
+    $('gr-top').replaceChildren(...(top5.length ? top5.map((l) => { const cc = catById('gasto', l.cat); return h('button', { class: 'en', type: 'button', onclick: () => openLanc(l) }, h('span', { class: 't' }, l.desc || cc.nome), h('span', { class: 'v' }, brl(l.valor)), h('span', { class: 'meta' }, h('span', { class: 'tag' }, marca(cc), cc.nome), l.data.split('-').reverse().join('/'))); }) : [h('div', { class: 'empty' }, 'Nada no período.')]));
   }
 
   // pizza (rosca) dos gastos por categoria: até 6 fatias, o resto vira "Outras"
@@ -1597,6 +1761,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.18.0', 'Ícones de linha nas categorias (dá pra trocar o ícone em Números > Categorias), opção de ver o orçamento por semana em vez de por dia (dentro da conta do "Pode gastar"), segurar um lançamento do extrato pra anotar igual de novo, atalho "Anotar gasto" segurando o ícone do app e opção de sempre abrir com os valores escondidos.'],
     ['2.17.1', 'Mandar backup agora abre o Compartilhar de verdade (o arquivo vai como .txt, e o Importar aceita .txt e .json).'],
     ['2.17.0', 'Backup: botão Mandar backup (Drive, WhatsApp...) pelo Compartilhar do celular, o aviso aparece depois de 7 dias sem backup, e importar agora deixa juntar o arquivo com o que já está no Plin, sem apagar nada.'],
     ['2.16.2', 'Consertos: o app percebe a virada do dia, gasto fixo do dia 29 a 31 fica no dia certo, o fundo não rola mais com uma tela aberta (e dá pra fechar arrastando de qualquer ponto), atualização sem perder o que você digitava, planilha com sinal certo e importar que grava tudo de uma vez.'],
@@ -1840,7 +2005,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       cats.replaceChildren(); extra.replaceChildren();
       if (st.tipo === 'gasto' || st.tipo === 'entrada') {
         cats.hidden = false;
-        cats.append(...catsPorUso(st.tipo, uso, st.cat).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(st.cat === c.id), onclick: () => { st.cat = c.id; catManual = true; paint(); } }, h('i', { style: `background:${c.cor}` }), c.nome)));
+        cats.append(...catsPorUso(st.tipo, uso, st.cat).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(st.cat === c.id), onclick: () => { st.cat = c.id; catManual = true; paint(); } }, marca(c), c.nome)));
         if (st.tipo === 'gasto') {
           if (!edit) {
             const ps = h('select', { id: 'l-parc', onchange: (e) => { st.parcelas = Number(e.target.value); paintParc(); } }, Array.from({ length: 12 }, (_, i) => h('option', { value: i + 1 }, i === 0 ? 'À vista' : `${i + 1}x`)));
@@ -2041,7 +2206,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     let cat = (p && p.cat) || '';
     let catManual = !!cat;
     const cats = h('div', { class: 'chips' });
-    const paintCats = () => cats.replaceChildren(...catsPorUso('gasto', uso, cat).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(cat === c.id), onclick: () => { cat = cat === c.id ? '' : c.id; catManual = true; paintCats(); } }, h('i', { style: `background:${c.cor}` }), c.nome)));
+    const paintCats = () => cats.replaceChildren(...catsPorUso('gasto', uso, cat).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(cat === c.id), onclick: () => { cat = cat === c.id ? '' : c.id; catManual = true; paintCats(); } }, marca(c), c.nome)));
     paintCats();
     desc.addEventListener('input', () => {
       if (catManual) return;
@@ -2238,14 +2403,19 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const nome = h('input', { type: 'text', id: 'cg-nome', value: c ? c.nome : '', placeholder: 'Nome da categoria' });
     let cor = c ? c.cor : PALETA[catsOf(tipo).length % PALETA.length];
     const sw = h('div', { class: 'chips' });
-    const paint = () => sw.replaceChildren(...PALETA.map((p) => h('button', { class: 'swatch', type: 'button', style: `background:${p}`, 'aria-label': 'Cor ' + p, 'aria-pressed': String(p === cor), onclick: () => { cor = p; paint(); } })));
+    let icone = c && c.icone ? c.icone : ''; // vazio = o Plin escolhe pelo nome
+    const ics = h('div', { class: 'icones' });
+    const paintIc = () => { const at = icone || iconeDe({ id: c ? c.id : '', nome: nome.value }) || '-'; ics.replaceChildren(...Object.keys(ICONES).map((k) => h('button', { type: 'button', 'aria-label': 'Ícone ' + ICONES[k][0], title: ICONES[k][0], 'aria-pressed': String(at === k), onclick: () => { icone = k; paintIc(); } }, svgIcone(k, cor))),
+      h('button', { class: 'sem', type: 'button', 'aria-label': 'Sem ícone (só a cor)', title: 'Sem ícone', 'aria-pressed': String(at === '-'), onclick: () => { icone = '-'; paintIc(); } }, h('i', { style: `background:${cor}` }))); };
+    const paint = () => { sw.replaceChildren(...PALETA.map((p) => h('button', { class: 'swatch', type: 'button', style: `background:${p}`, 'aria-label': 'Cor ' + p, 'aria-pressed': String(p === cor), onclick: () => { cor = p; paint(); } }))); paintIc(); };
     paint();
+    nome.addEventListener('input', () => { if (!icone) paintIc(); });
     const teto = moneyInput(c && c.teto, 'Sem teto'); teto.id = 'cg-teto';
     const arq = h('input', { type: 'checkbox', id: 'cg-arq' }); arq.checked = !!(c && c.arquivada);
     const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, c ? 'Salvar' : 'Criar');
     const usada = c && all().some((l) => l.cat === c.id && l.tipo === tipo);
     const key = tipo === 'entrada' ? 'entrada' : 'gasto';
-    const body = h('div', { class: 'stack', style: 'gap:12px' }, field('Nome', nome), h('div', { class: 'field' }, h('span', null, 'Cor'), sw),
+    const body = h('div', { class: 'stack', style: 'gap:12px' }, field('Nome', nome), h('div', { class: 'field' }, h('span', null, 'Cor'), sw), h('div', { class: 'field' }, h('span', null, 'Ícone'), ics),
       key === 'gasto' ? field('Teto por mês (opcional)', teto) : null,
       key === 'gasto' ? h('p', { class: 'sub', style: 'margin-top:-6px' }, 'Com teto, a categoria aparece em "Tetos do mês" e o Plin avisa quando chegar perto.') : null,
       c ? h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:600' }, arq, 'Arquivada (some do Anotar, o histórico continua)') : null,
@@ -2255,6 +2425,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     save.addEventListener('click', async () => {
       if (!nome.value.trim()) { toast('Dê um nome.'); return; }
       const rec = { id: c ? c.id : uid(), nome: nome.value.trim(), cor };
+      if (icone) rec.icone = icone;
       const tt = key === 'gasto' && teto.value.trim() ? parseCent(teto.value) : 0;
       if (tt > 0) rec.teto = tt;
       if (arq.checked) rec.arquivada = true;
@@ -2378,6 +2549,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     document.activeElement && document.activeElement.blur();
     render(); await salvarCfg(); toast('Divisão salva.');
   });
+  $('op-oculto').checked = lsGet('plin-abrir-oculto') === '1';
+  $('op-oculto').addEventListener('change', (e) => { lsSet('plin-abrir-oculto', e.target.checked ? '1' : '0'); toast(e.target.checked ? 'Pronto: o Plin vai abrir com os valores escondidos.' : 'O Plin vai abrir como você deixou da última vez.'); });
   $('ex-bkp').addEventListener('click', salvarBackup);
   $('ex-mandar').hidden = !podeMandar();
   $('ex-mandar').addEventListener('click', mandarBackup);
@@ -2417,7 +2590,10 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   window.addEventListener('focus', conferirDia);
   setInterval(() => { if (document.visibilityState === 'visible') conferirDia(); }, 60000);
   render();
-  store.init();
+  store.init().then(() => {
+    // veio pelo atalho do ícone (segurar o ícone do Plin > Anotar gasto)
+    if (new URLSearchParams(location.search).has('anotar') && carregou) { history.replaceState(null, '', location.pathname + '?app=plin'); openLanc(); }
+  });
   // app instalável e funcionando sem internet (só quando servido por http/https)
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     // quando uma versão nova do app assume, recarrega uma vez para mostrar ela
