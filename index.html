@@ -179,7 +179,9 @@ svg.ic { width: 17px; height: 17px; flex: none; display: inline-block; }
 .sem .tr i { display: block; height: 100%; background: var(--tang); border-radius: 4px; }
 .sem.agora span:first-child { font-weight: 700; }
 .sem b { font-size: .84rem; }
-.sv-opt { margin: 2px 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.filtro-cat { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: .8rem; font-weight: 600; color: var(--muted); background: none; border: 0; padding: 0 0 10px; }
+.filtro-cat svg { width: 15px; height: 15px; }
+.filtro-cat.on { color: var(--tang); }
 .modo-orc { justify-content: center; }
 .modo-orc .chip { padding: 4px 12px; font-size: .78rem; }
 .swatch { width: 30px; height: 30px; border-radius: 9px; border: 2px solid transparent; }
@@ -448,7 +450,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     <div class="kpis" id="gr-kpis"></div>
     <div class="panel">
       <div class="grp-h"><h2>Por categoria</h2><span class="sub" id="gr-cat-sub"></span></div>
-      <label class="opt sv-opt" id="gr-sv-w" hidden><input type="checkbox" id="gr-sv"> <span>Sem viagem<small>Tira a Viagem das médias e de todos os gráficos.</small></span></label>
+      <button class="filtro-cat" type="button" id="gr-filtro"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4-2v-4.5z"/></svg><span>Todas as categorias</span></button>
       <div id="gr-pizza" class="pizza"></div>
       <p class="sub">Toque numa categoria para ver ela mês a mês.</p>
       <div id="gr-cats" class="bars"></div>
@@ -1458,18 +1460,28 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     return ms;
   }
   // "Sem viagem" nos gráficos: tira a categoria de viagem das contas (fica salvo neste aparelho)
-  let semViagem = lsGet('plin-sem-viagem') === '1';
-  const ehViagem = (id) => { const c = catsOf('gasto').find((x) => x.id === id); return !!c && (c.id === 'viagem' || iconeDe(c) === 'aviao' || /viage/.test(semAcento(c.nome))); };
-  const temViagem = () => catsOf('gasto').some((c) => ehViagem(c.id));
-  const contaGrafico = (l) => l.tipo === 'gasto' && !(semViagem && ehViagem(l.cat));
+  // filtro dos gráficos: categorias escondidas das contas e dos gráficos (fica salvo neste aparelho)
+  let ocultasGraf = new Set();
+  try { ocultasGraf = new Set(JSON.parse(lsGet('plin-graf-ocultas') || '[]')); } catch (e) { /* ok */ }
+  const salvarOcultas = () => lsSet('plin-graf-ocultas', JSON.stringify([...ocultasGraf]));
+  const contaGrafico = (l) => l.tipo === 'gasto' && !ocultasGraf.has(l.cat);
+  function openFiltroGraf() {
+    const grade = h('div', { class: 'chips cat-grade compacta' });
+    const pinta = () => grade.replaceChildren(...catsOf('gasto').filter((c) => !c.arquivada || ocultasGraf.has(c.id)).map((c) => h('button', { class: 'chip cat' + (ocultasGraf.has(c.id) ? ' arq' : ''), style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(!ocultasGraf.has(c.id)),
+      onclick: () => { if (ocultasGraf.has(c.id)) ocultasGraf.delete(c.id); else ocultasGraf.add(c.id); salvarOcultas(); if (catSel && ocultasGraf.has(catSel)) catSel = null; barSel = null; pinta(); renderGraficos(); } }, marca(c), nomeCat(c.nome))));
+    pinta();
+    sheet('Filtrar os gráficos', h('div', { class: 'stack', style: 'gap:12px' }, h('p', { class: 'sub' }, 'Toque numa categoria pra tirar ela das médias e de todos os gráficos. Toque de novo pra voltar.'), grade,
+      h('div', { class: 'row-btns' }, h('button', { class: 'btn alt', type: 'button', onclick: () => { ocultasGraf.clear(); salvarOcultas(); pinta(); renderGraficos(); } }, 'Mostrar todas'))));
+  }
   const gastosDe = (ms) => ms.flatMap((m) => (meses[m] || []).filter(contaGrafico));
   function nomePer(ms) { return ms.length === 1 ? mLong(ms[0]) : `${cap(mShort(ms[0]))}/${ms[0].slice(2, 4)} a ${mShort(ms[ms.length - 1])}/${ms[ms.length - 1].slice(2, 4)}`; }
 
   function renderGraficos() {
     for (const b of $('gr-per').querySelectorAll('button[data-p]')) b.setAttribute('aria-pressed', String(Number(b.dataset.p) === per));
-    $('gr-sv-w').hidden = !temViagem(); if (!temViagem()) semViagem = false;
-    $('gr-sv').checked = semViagem;
-    if (semViagem && catSel && ehViagem(catSel)) catSel = null;
+    const ocVal = carregou ? [...ocultasGraf].filter((id) => catsOf('gasto').some((c) => c.id === id)) : [];
+    const nOc = ocVal.length, fb = $('gr-filtro');
+    fb.classList.toggle('on', nOc > 0);
+    fb.lastChild.textContent = !nOc ? 'Todas as categorias' : nOc === 1 ? `Sem ${catById('gasto', ocVal[0]).nome}` : `Sem ${nOc} categorias`;
     if (!carregou) return;
     const ms = mesesDoPeriodo();
     const gs = gastosDe(ms);
@@ -1849,7 +1861,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
-    ['2.19.0', 'Tocando no Gastou: calendário do mês com cada dia colorido pelo gasto, total de cada semana e comparação com o mesmo mês do ano passado. Botão "Sem viagem" nos Gráficos. E um segredo: abra um gasto e toque no valor.'],
+    ['2.19.0', 'Tocando no Gastou: calendário do mês com cada dia colorido pelo gasto, total de cada semana e comparação com o mesmo mês do ano passado. Filtro nos Gráficos pra esconder categorias (Viagem, por exemplo). E um segredo: toque no valor de um gasto.'],
     ['2.18.1', 'Categorias em grade, com o ícone grande e o nome embaixo, no Anotar e na Config (mais compacta lá, com as arquivadas recolhidas). Ícones maiores no resto do app.'],
     ['2.18.0', 'Ícones de linha nas categorias (dá pra trocar o ícone em Números > Categorias), opção de ver o orçamento por semana em vez de por dia (dentro da conta do "Pode gastar"), segurar um lançamento do extrato pra anotar igual de novo, atalho "Anotar gasto" segurando o ícone do app e opção de sempre abrir com os valores escondidos.'],
     ['2.17.1', 'Mandar backup agora abre o Compartilhar de verdade (o arquivo vai como .txt, e o Importar aceita .txt e .json).'],
@@ -2638,7 +2650,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   $('rc-new').addEventListener('click', () => openRec());
   $('af-new').addEventListener('click', () => openAporte());
   $('cg-new').addEventListener('click', () => openCat(catTab));
-  $('gr-sv').addEventListener('change', (e) => { semViagem = e.target.checked; lsSet('plin-sem-viagem', semViagem ? '1' : '0'); barSel = null; renderGraficos(); toast(semViagem ? 'Gráficos sem as viagens.' : 'Gráficos com tudo de novo.'); });
+  $('gr-filtro').addEventListener('click', openFiltroGraf);
   $('gr-per').addEventListener('click', (e) => { const b = e.target.closest('button[data-p]'); if (b) { per = Number(b.dataset.p); barSel = null; renderGraficos(); } });
   $('gr-limpar').addEventListener('click', () => { catSel = null; barSel = null; renderGraficos(); });
   $('cg-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { catTab = b.dataset.k; renderNumeros(); } });
