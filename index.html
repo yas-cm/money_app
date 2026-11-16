@@ -140,14 +140,28 @@ button { cursor: pointer; }
 .opt input { margin-top: 3px; width: 18px; height: 18px; flex: none; accent-color: var(--tang); }
 .opt small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; margin-top: 2px; }
 .es .en { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-svg.ic { width: 14px; height: 14px; flex: none; display: inline-block; }
-.chip svg.ic { width: 18px; height: 18px; margin-left: -3px; }
-.teto .t svg.ic { width: 15px; height: 15px; vertical-align: -3px; margin-right: 4px; }
+svg.ic { width: 17px; height: 17px; flex: none; display: inline-block; }
+.chip svg.ic { width: 22px; height: 22px; margin-left: -4px; }
+.teto .t svg.ic { width: 18px; height: 18px; vertical-align: -4px; margin-right: 4px; }
 .icones { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
 .icones button { aspect-ratio: 1; border: 1px solid var(--line); background: var(--panel); border-radius: 12px; display: grid; place-items: center; padding: 0; }
-.icones button svg.ic { width: 24px; height: 24px; }
+.icones button svg.ic { width: 28px; height: 28px; }
 .icones button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
 .icones .sem i { width: 12px; height: 12px; border-radius: 3px; display: block; }
+.cat-grade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.cat-grade .chip.cat { flex-direction: column; justify-content: flex-start; gap: 5px; border-radius: 14px; padding: 9px 2px 7px; font-size: .72rem; line-height: 1.15; text-align: center; min-width: 0; }
+.cat-grade .chip.cat svg.ic { width: 30px; height: 30px; margin: 0; }
+.cat-grade .chip.cat i { width: 22px; height: 22px; border-radius: 6px; margin: 4px 0; }
+.cat-grade .chip.cat span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: normal; word-break: normal; max-width: 100%; }
+.cat-grade .chip.cat span.l1 { font-size: .66rem; }
+.cat-grade .chip.cat span.l2 { font-size: .6rem; letter-spacing: -.02em; }
+.cat-grade .chip.cat[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 16%, var(--panel)); color: var(--ink); border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
+.cat-grade.compacta .chip.cat { padding: 7px 2px 6px; gap: 3px; border-radius: 12px; }
+.cat-grade.compacta .chip.cat svg.ic { width: 24px; height: 24px; }
+.cat-grade.compacta .chip.cat i { width: 18px; height: 18px; margin: 3px 0; }
+.cat-grade.compacta .teto-tag { margin: 0; font-size: .6rem; line-height: 1; }
+.cat-grade .arq-tog { grid-column: 1 / -1; font: inherit; font-size: .8rem; font-weight: 700; color: var(--muted); background: none; border: 0; text-align: left; padding: 8px 2px 2px; }
+.cat-grade .arq-tog small { font-weight: 500; }
 .modo-orc { justify-content: center; }
 .modo-orc .chip { padding: 4px 12px; font-size: .78rem; }
 .swatch { width: 30px; height: 30px; border-radius: 9px; border: 2px solid transparent; }
@@ -439,7 +453,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
         <button class="chip" type="button" data-k="gasto" aria-pressed="true">Gastos</button>
         <button class="chip" type="button" data-k="entrada" aria-pressed="false">Entradas</button>
       </div>
-      <div class="chips" id="cg-list"></div>
+      <div class="chips cat-grade compacta" id="cg-list"></div>
       <div class="row-btns"><button class="btn alt" type="button" id="cg-new">Nova categoria</button></div>
     </div>
     <div class="panel">
@@ -468,7 +482,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.18.0';
+  const VERSAO = '2.18.1';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -586,6 +600,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     return el;
   }
   // marca da categoria: o ícone na cor dela (ou o quadradinho colorido, se ela não tiver ícone)
+  // nome embaixo do ícone na grade do Anotar: palavra comprida ganha letra menor, pra não quebrar no meio
+  function nomeCat(n) { const m = Math.max(...String(n).split(/\s+/).map((w) => w.length)); return h('span', { class: m >= 13 ? 'l2' : m >= 10 ? 'l1' : null }, n); }
   function marca(c) { const k = iconeDe(c); return k ? svgIcone(k, c.cor) : h('i', { style: `background:${c.cor}` }); }
   const PALETA = ['#f2662e', '#17a387', '#5b6cf0', '#e2a623', '#c2459a', '#2f8fd8', '#8a5cd6', '#e0514f', '#4fae4a', '#d97a1e', '#2bb5c8', '#9c7b55', '#6b7891', '#d4588a', '#7a9e2f', '#3c5bd1'];
   const GRUPOS = {
@@ -1396,12 +1412,14 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     $('cfg-save').disabled = t !== 100;
   }
 
+  let verArq = false;
   function renderNumeros() {
     for (const b of $('cg-seg').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.k === catTab));
-    const chipCat = (c) => h('button', { class: 'chip' + (c.arquivada ? ' arq' : ''), type: 'button', onclick: () => openCat(catTab, c) }, marca(c), c.nome, c.teto > 0 ? h('small', { class: 'teto-tag' }, 'teto ' + brl(c.teto)) : null);
+    const chipCat = (c) => h('button', { class: 'chip cat' + (c.arquivada ? ' arq' : ''), style: `--c:${c.cor}`, type: 'button', onclick: () => openCat(catTab, c) }, marca(c), nomeCat(c.nome), c.teto > 0 ? h('small', { class: 'teto-tag' }, 'teto ' + brl(c.teto)) : null);
     const ativas = catsOf(catTab).filter((c) => !c.arquivada), arqs = catsOf(catTab).filter((c) => c.arquivada);
+    // arquivadas ficam recolhidas pra não ocupar espaço
     $('cg-list').replaceChildren(...[...ativas.map(chipCat),
-      arqs.length ? h('div', { class: 'label', style: 'width:100%;margin-top:8px' }, 'Arquivadas (não aparecem no Anotar)') : null, ...arqs.map(chipCat)].filter(Boolean));
+      arqs.length ? h('button', { class: 'arq-tog', type: 'button', 'aria-expanded': String(verArq), onclick: () => { verArq = !verArq; renderNumeros(); } }, `${verArq ? '▾' : '▸'} Arquivadas (${arqs.length})`, h('small', null, ' não aparecem no Anotar')) : null, ...(verArq ? arqs.map(chipCat) : [])].filter(Boolean));
 
     const n = all().length;
     $('diag').textContent = `Plin ${VERSAO} · ${n} lançamentos · dados: ${$('status').textContent}` + (store.erro ? ` (${store.erro})` : '') + (store.modo === 'local-ls' ? ' · usando localStorage' : '');
@@ -1761,6 +1779,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.18.1', 'Categorias em grade, com o ícone grande e o nome embaixo, no Anotar e na Config (mais compacta lá, com as arquivadas recolhidas). Ícones maiores no resto do app.'],
     ['2.18.0', 'Ícones de linha nas categorias (dá pra trocar o ícone em Números > Categorias), opção de ver o orçamento por semana em vez de por dia (dentro da conta do "Pode gastar"), segurar um lançamento do extrato pra anotar igual de novo, atalho "Anotar gasto" segurando o ícone do app e opção de sempre abrir com os valores escondidos.'],
     ['2.17.1', 'Mandar backup agora abre o Compartilhar de verdade (o arquivo vai como .txt, e o Importar aceita .txt e .json).'],
     ['2.17.0', 'Backup: botão Mandar backup (Drive, WhatsApp...) pelo Compartilhar do celular, o aviso aparece depois de 7 dias sem backup, e importar agora deixa juntar o arquivo com o que já está no Plin, sem apagar nada.'],
@@ -1985,7 +2004,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       const n = st.parcelas || 1; parcInfo.hidden = n <= 1;
       if (n > 1) { const v = emReais() || 0; parcInfo.textContent = `Valor total. Vira ${n}x de ${brlReal(Math.floor(v / n))}, uma por mês a partir da data.`; }
     }
-    const cats = h('div', { class: 'chips' });
+    const cats = h('div', { class: 'chips cat-grade' });
     const extra = h('div', { class: 'stack', style: 'gap:12px' });
     let paintTransf = () => {};
     const origemBox = h('div', { class: 'stack', style: 'gap:4px' });
@@ -2005,7 +2024,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       cats.replaceChildren(); extra.replaceChildren();
       if (st.tipo === 'gasto' || st.tipo === 'entrada') {
         cats.hidden = false;
-        cats.append(...catsPorUso(st.tipo, uso, st.cat).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(st.cat === c.id), onclick: () => { st.cat = c.id; catManual = true; paint(); } }, marca(c), c.nome)));
+        cats.append(...catsPorUso(st.tipo, uso, st.cat).map((c) => h('button', { class: 'chip cat', style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(st.cat === c.id), onclick: () => { st.cat = c.id; catManual = true; paint(); } }, marca(c), nomeCat(c.nome))));
         if (st.tipo === 'gasto') {
           if (!edit) {
             const ps = h('select', { id: 'l-parc', onchange: (e) => { st.parcelas = Number(e.target.value); paintParc(); } }, Array.from({ length: 12 }, (_, i) => h('option', { value: i + 1 }, i === 0 ? 'À vista' : `${i + 1}x`)));
@@ -2205,8 +2224,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const desc = h('input', { type: 'text', id: 'pj-desc', value: p ? p.desc : '', placeholder: 'O que é? Ex.: Presentes de Natal', autocomplete: 'off' });
     let cat = (p && p.cat) || '';
     let catManual = !!cat;
-    const cats = h('div', { class: 'chips' });
-    const paintCats = () => cats.replaceChildren(...catsPorUso('gasto', uso, cat).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(cat === c.id), onclick: () => { cat = cat === c.id ? '' : c.id; catManual = true; paintCats(); } }, marca(c), c.nome)));
+    const cats = h('div', { class: 'chips cat-grade' });
+    const paintCats = () => cats.replaceChildren(...catsPorUso('gasto', uso, cat).map((c) => h('button', { class: 'chip cat', style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(cat === c.id), onclick: () => { cat = cat === c.id ? '' : c.id; catManual = true; paintCats(); } }, marca(c), nomeCat(c.nome))));
     paintCats();
     desc.addEventListener('input', () => {
       if (catManual) return;
