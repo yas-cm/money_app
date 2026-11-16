@@ -149,11 +149,12 @@ button { cursor: pointer; }
 .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .pad button { border: 0; background: var(--field); border-radius: 12px; padding: 12px 0; font-size: 1.2rem; font-weight: 600; }
 .pad button:active { background: var(--line); }
-.scrim { position: fixed; inset: 0; background: rgba(8, 11, 22, .5); z-index: 30; display: flex; align-items: flex-end; justify-content: center; }
-.sheet { width: 100%; max-width: 34rem; max-height: 94%; overflow: auto; background: var(--panel); border-radius: 22px 22px 0 0; padding: 10px max(16px, env(safe-area-inset-left, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.scrim { position: fixed; inset: 0; overscroll-behavior: contain; touch-action: none; background: rgba(8, 11, 22, .5); z-index: 30; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { width: 100%; max-width: 34rem; max-height: 94%; overflow: auto; overscroll-behavior: contain; touch-action: pan-y; background: var(--panel); border-radius: 22px 22px 0 0; padding: 10px max(16px, env(safe-area-inset-left, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .sheet-top { display: grid; gap: 12px; touch-action: none; margin: -10px -16px 0; padding: 10px 16px 0; cursor: grab; }
 .grab { width: 40px; height: 4px; border-radius: 2px; background: var(--line); justify-self: center; }
 .sheet.drag { transition: none !important; }
+body.travado { overflow: hidden; }
 .sheet.solta { transition: transform .2s ease; }
 .sheet-h { display: flex; justify-content: space-between; align-items: center; }
 .sheet-h h2 { margin: 0; font-size: 1.05rem; }
@@ -448,7 +449,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.16.1';
+  const VERSAO = '2.16.2';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -582,6 +583,17 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       render();
     },
     podeGravar() { return carregou; },
+    // grava várias chaves de uma vez: ou entra tudo, ou nada muda
+    async gravarVarios(pares) {
+      this.salvando++; status();
+      try {
+        if (this.db) await idb.tx(this.db, 'readwrite', (os) => { for (const [k, v] of pares) os.put(v, k); });
+        else { const ant = pares.map(([k]) => [k, localStorage.getItem(LS + k)]); try { for (const [k, v] of pares) localStorage.setItem(LS + k, JSON.stringify(v)); } catch (e) { for (const [k, v] of ant) v === null ? localStorage.removeItem(LS + k) : localStorage.setItem(LS + k, v); throw e; } }
+      } catch (e) {
+        toast(e && e.name === 'QuotaExceededError' ? 'O espaço do navegador encheu. Salve um backup.' : 'Não consegui salvar neste aparelho.');
+        throw e;
+      } finally { this.salvando--; status(); }
+    },
     async gravar(path, body) {
       this.salvando++; status();
       try {
@@ -905,7 +917,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const hojeYm = ymOf(todayISO());
     const pl = planoDe(mes);
     if (mes < hojeYm) { $('pg-p').hidden = true; return; }
-    const fixos = recorrentesDe(mes).map((r) => ({ dia: r.dia || 1, t: r.desc, done: r.feito, valor: r.valor, extra: 'todo mês', abrir: { tipo: 'gasto', cat: r.cat, valor: r.valor, desc: r.desc, rec: r.id, data: mes + '-' + String(Math.min(r.dia || 1, 28)).padStart(2, '0') } }));
+    const fixos = recorrentesDe(mes).map((r) => ({ dia: r.dia || 1, t: r.desc, done: r.feito, valor: r.valor, extra: 'todo mês', abrir: { tipo: 'gasto', cat: r.cat, valor: r.valor, desc: r.desc, rec: r.id, data: mes + '-' + String(Math.min(r.dia || 1, diasNoMes(mes))).padStart(2, '0') } }));
     const passos = [];
     const apsPlano = pl === 'fixo' ? cfg.aportesFixos || [] : pl === 'mes' ? cfg.planosMes[mes].aportes || [] : [];
     for (const a of apsPlano) {
@@ -1573,6 +1585,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.16.2', 'Consertos: o app percebe a virada do dia, gasto fixo do dia 29 a 31 fica no dia certo, o fundo não rola mais com uma tela aberta (e dá pra fechar arrastando de qualquer ponto), atualização sem perder o que você digitava, planilha com sinal certo e importar que grava tudo de uma vez.'],
     ['2.16.1', 'Sem o botão Fechar nas telas que sobem: fecha arrastando a barrinha ou tocando fora.'],
     ['2.16.0', 'Informações escondidas: tocar no pote, em Entrou/Gastou/Guardou, no quadro Hoje, no total do dia, na meta da caixinha e na maior categoria; segurar o logo mostra curiosidades; e esta lista.'],
     ['2.15.1', 'Rosca por categoria nos gráficos, "Gastou no dia" no extrato, a conta do "pode gastar por dia" e planejados com a tela do Anotar.'],
@@ -1607,7 +1620,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   // ---------- folhas (sheets) ----------
   function sheet(title, body) {
     const root = $('sheet-root');
-    const close = () => { root.replaceChildren(); document.removeEventListener('keydown', esc); };
+    const close = () => { root.replaceChildren(); document.removeEventListener('keydown', esc); document.body.classList.remove('travado'); window.dispatchEvent(new Event('plin-sheet-fechou')); };
+    document.body.classList.add('travado');
     const esc = (e) => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', esc);
     const topo = h('div', { class: 'sheet-top' }, h('div', { class: 'grab' }), h('div', { class: 'sheet-h' }, h('h2', null, title)));
@@ -1619,6 +1633,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     // arrastar pra baixo pela alça (ou pelo título) fecha a folha
     let y0 = null, t0 = 0, dy = 0, pid = null;
     topo.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch') return; // no toque, quem cuida é o arraste da folha inteira (abaixo)
       if (e.target.closest('button') || (e.pointerType === 'mouse' && e.button !== 0)) return;
       y0 = e.clientY; t0 = performance.now(); dy = 0; pid = e.pointerId;
       try { topo.setPointerCapture(pid); } catch (_) {}
@@ -1632,6 +1647,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     });
     const soltar = (e) => {
       if (y0 === null || (e && e.pointerId !== pid)) return;
+      if (!e) y0 = 0;
       const vel = dy / Math.max(1, performance.now() - t0);
       y0 = null; sh.classList.remove('drag'); sh.classList.add('solta');
       if (dy > Math.min(120, sh.offsetHeight * 0.25) || (dy > 30 && vel > 0.5)) {
@@ -1642,6 +1658,33 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     };
     topo.addEventListener('pointerup', soltar);
     topo.addEventListener('pointercancel', soltar);
+    // no toque: arrastar pra baixo de qualquer ponto fecha, quando a folha está no topo
+    let ty0 = null, tArr = false, arrastou = false;
+    sh.addEventListener('touchstart', (e) => {
+      arrastou = false;
+      if (e.touches.length !== 1 || e.target.closest('input[type=range], textarea, select')) { ty0 = null; return; }
+      ty0 = e.touches[0].clientY; tArr = false; t0 = performance.now(); dy = 0;
+    }, { passive: true });
+    sh.addEventListener('touchmove', (e) => {
+      if (ty0 === null) return;
+      const d = e.touches[0].clientY - ty0;
+      if (!tArr) {
+        if (sh.scrollTop > 0 || d < 0) { if (Math.abs(d) > 8) ty0 = null; return; } // rolando a folha: deixa
+        if (d < 8) return;
+        tArr = true; ty0 += 8; t0 = performance.now(); y0 = 0; pid = null;
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        sh.classList.remove('solta'); sh.classList.add('drag');
+      }
+      e.preventDefault();
+      dy = Math.max(0, e.touches[0].clientY - ty0);
+      sh.style.transform = dy ? `translateY(${dy}px)` : '';
+      scrim.style.background = `rgba(8, 11, 22, ${0.5 * Math.max(0, 1 - dy / (sh.offsetHeight || 400))})`;
+    }, { passive: false });
+    const soltarToque = () => { if (ty0 === null) return; const era = tArr; ty0 = null; tArr = false; if (era) { arrastou = true; soltar(); } };
+    sh.addEventListener('touchend', soltarToque);
+    sh.addEventListener('touchcancel', soltarToque);
+    // o toque que arrastou não vira clique no que estava embaixo do dedo
+    sh.addEventListener('click', (e) => { if (arrastou) { arrastou = false; e.stopPropagation(); e.preventDefault(); } }, true);
     return { close, el: sh };
   }
   function dangerBtn(label, action) {
@@ -2246,7 +2289,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       const cat = l.tipo === 'gasto' || l.tipo === 'entrada' ? catById(l.tipo, l.cat).nome : '';
       const cx = cxById(l.caixinha || l.origem);
       const cxNome = l.tipo === 'transferir' ? `${nomeCx(l.caixinha)} → ${nomeCx(l.para)}` : cx ? cx.nome : '';
-      linhas.push([l.data.split('-').reverse().join('/'), cap(l.tipo), centStr(l.valor).replace(/\./g, ''), q(cat), q(l.desc), q(cxNome)].join(';'));
+      const sinal = l.tipo === 'gasto' || l.tipo === 'guardar' ? '-' : '';
+      linhas.push([l.data.split('-').reverse().join('/'), cap(l.tipo), (l.tipo === 'transferir' ? '' : sinal) + centStr(l.valor).replace(/\./g, ''), q(cat), q(l.desc), q(cxNome)].join(';'));
     }
     return '﻿' + linhas.join('\r\n');
   }
@@ -2295,22 +2339,39 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       h('div', { class: 'row-btns' }, dangerBtn('Trocar pelos dados do arquivo', async () => {
         sh.close();
         const antigos = Object.keys(meses);
+        const agora = Date.now();
+        const pares = [['plin/config', Object.assign({}, novo.cfg, { atualizadoEm: agora })],
+          ...[...new Set([...antigos, ...Object.keys(novo.meses)])].map((ym) => ['meses/' + ym, { itens: novo.meses[ym] || [], atualizadoEm: agora }])];
+        try { await store.gravarVarios(pares); } catch (e) { toast('Não consegui importar. Nada foi mudado.'); return; }
         cfg = novo.cfg; meses = novo.meses; render();
-        await salvarCfg();
-        for (const ym of new Set([...antigos, ...Object.keys(novo.meses)])) await salvarMes(ym);
         toast('Backup importado.');
       })));
     const sh = sheet('Importar backup', body);
   });
 
   $('versao').textContent = VERSAO;
+  // virada do dia: quando o app volta pra tela num dia (ou mês) novo, refaz as contas
+  let diaVisto = todayISO();
+  const conferirDia = () => {
+    const hoje = todayISO(); if (hoje === diaVisto) return;
+    if (mes === ymOf(diaVisto) && ymOf(hoje) !== mes) mes = ymOf(hoje); // estava no mês atual: segue pro mês novo
+    diaVisto = hoje; if (carregou) render();
+  };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') conferirDia(); });
+  window.addEventListener('focus', conferirDia);
+  setInterval(() => { if (document.visibilityState === 'visible') conferirDia(); }, 60000);
   render();
   store.init();
   // app instalável e funcionando sem internet (só quando servido por http/https)
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     // quando uma versão nova do app assume, recarrega uma vez para mostrar ela
     const tinha = !!navigator.serviceWorker.controller; let recarregou = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => { if (tinha && !recarregou) { recarregou = true; location.reload(); } });
+    // ...mas só quando nenhuma tela estiver aberta, pra não perder o que você estava digitando
+    const telaAberta = () => !!$('sheet-root').firstChild;
+    let esperando = false;
+    const recarregar = () => { if (recarregou) return; if (telaAberta()) { esperando = true; return; } recarregou = true; location.reload(); };
+    window.addEventListener('plin-sheet-fechou', () => { if (esperando) setTimeout(recarregar, 300); });
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (tinha) recarregar(); });
     navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {});
   }
 })();
