@@ -148,6 +148,12 @@ svg.ic { width: 17px; height: 17px; flex: none; display: inline-block; }
 .icones button svg.ic { width: 28px; height: 28px; }
 .icones button[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
 .icones .sem i { width: 12px; height: 12px; border-radius: 3px; display: block; }
+.cat-grade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.cat-grade .chip.cat { flex-direction: column; justify-content: flex-start; gap: 5px; border-radius: 14px; padding: 9px 3px 7px; font-size: .72rem; line-height: 1.15; text-align: center; min-width: 0; }
+.cat-grade .chip.cat svg.ic { width: 30px; height: 30px; margin: 0; }
+.cat-grade .chip.cat i { width: 22px; height: 22px; border-radius: 6px; margin: 4px 0; }
+.cat-grade .chip.cat span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; max-width: 100%; }
+.cat-grade .chip.cat[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 16%, var(--panel)); color: var(--ink); border-color: var(--c); box-shadow: inset 0 0 0 1px var(--c); }
 .modo-orc { justify-content: center; }
 .modo-orc .chip { padding: 4px 12px; font-size: .78rem; }
 .swatch { width: 30px; height: 30px; border-radius: 9px; border: 2px solid transparent; }
@@ -1761,7 +1767,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
-    ['2.18.1', 'Ícones das categorias maiores.'],
+    ['2.18.1', 'No Anotar, as categorias viraram uma grade com o ícone grande e o nome embaixo. Ícones maiores no resto do app também.'],
     ['2.18.0', 'Ícones de linha nas categorias (dá pra trocar o ícone em Números > Categorias), opção de ver o orçamento por semana em vez de por dia (dentro da conta do "Pode gastar"), segurar um lançamento do extrato pra anotar igual de novo, atalho "Anotar gasto" segurando o ícone do app e opção de sempre abrir com os valores escondidos.'],
     ['2.17.1', 'Mandar backup agora abre o Compartilhar de verdade (o arquivo vai como .txt, e o Importar aceita .txt e .json).'],
     ['2.17.0', 'Backup: botão Mandar backup (Drive, WhatsApp...) pelo Compartilhar do celular, o aviso aparece depois de 7 dias sem backup, e importar agora deixa juntar o arquivo com o que já está no Plin, sem apagar nada.'],
@@ -1986,7 +1992,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       const n = st.parcelas || 1; parcInfo.hidden = n <= 1;
       if (n > 1) { const v = emReais() || 0; parcInfo.textContent = `Valor total. Vira ${n}x de ${brlReal(Math.floor(v / n))}, uma por mês a partir da data.`; }
     }
-    const cats = h('div', { class: 'chips' });
+    const cats = h('div', { class: 'chips cat-grade' });
     const extra = h('div', { class: 'stack', style: 'gap:12px' });
     let paintTransf = () => {};
     const origemBox = h('div', { class: 'stack', style: 'gap:4px' });
@@ -2006,7 +2012,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       cats.replaceChildren(); extra.replaceChildren();
       if (st.tipo === 'gasto' || st.tipo === 'entrada') {
         cats.hidden = false;
-        cats.append(...catsPorUso(st.tipo, uso, st.cat).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(st.cat === c.id), onclick: () => { st.cat = c.id; catManual = true; paint(); } }, marca(c), c.nome)));
+        cats.append(...catsPorUso(st.tipo, uso, st.cat).map((c) => h('button', { class: 'chip cat', style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(st.cat === c.id), onclick: () => { st.cat = c.id; catManual = true; paint(); } }, marca(c), h('span', null, c.nome))));
         if (st.tipo === 'gasto') {
           if (!edit) {
             const ps = h('select', { id: 'l-parc', onchange: (e) => { st.parcelas = Number(e.target.value); paintParc(); } }, Array.from({ length: 12 }, (_, i) => h('option', { value: i + 1 }, i === 0 ? 'À vista' : `${i + 1}x`)));
@@ -2206,8 +2212,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const desc = h('input', { type: 'text', id: 'pj-desc', value: p ? p.desc : '', placeholder: 'O que é? Ex.: Presentes de Natal', autocomplete: 'off' });
     let cat = (p && p.cat) || '';
     let catManual = !!cat;
-    const cats = h('div', { class: 'chips' });
-    const paintCats = () => cats.replaceChildren(...catsPorUso('gasto', uso, cat).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(cat === c.id), onclick: () => { cat = cat === c.id ? '' : c.id; catManual = true; paintCats(); } }, marca(c), c.nome)));
+    const cats = h('div', { class: 'chips cat-grade' });
+    const paintCats = () => cats.replaceChildren(...catsPorUso('gasto', uso, cat).map((c) => h('button', { class: 'chip cat', style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(cat === c.id), onclick: () => { cat = cat === c.id ? '' : c.id; catManual = true; paintCats(); } }, marca(c), h('span', null, c.nome))));
     paintCats();
     desc.addEventListener('input', () => {
       if (catManual) return;
