@@ -162,6 +162,29 @@ svg.ic { width: 17px; height: 17px; flex: none; display: inline-block; }
 .cat-grade.compacta .teto-tag { margin: 0; font-size: .6rem; line-height: 1; }
 .cat-grade .arq-tog { grid-column: 1 / -1; font: inherit; font-size: .8rem; font-weight: 700; color: var(--muted); background: none; border: 0; text-align: left; padding: 8px 2px 2px; }
 .cat-grade .arq-tog small { font-weight: 500; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-h { text-align: center; font-size: .7rem; font-weight: 700; color: var(--muted); }
+.cal-d { height: 38px; min-width: 0; margin: 0; border: 0; border-radius: 9px; font: inherit; font-size: .8rem; font-weight: 600; color: var(--ink); background: var(--field); padding: 0; }
+.cal-d.n1, .cal-leg .n1 { background: color-mix(in srgb, var(--tang) 22%, var(--panel)); }
+.cal-d.n2, .cal-leg .n2 { background: color-mix(in srgb, var(--tang) 45%, var(--panel)); }
+.cal-d.n3, .cal-leg .n3 { background: color-mix(in srgb, var(--tang) 70%, var(--panel)); color: #fff; }
+.cal-d.n4, .cal-leg .n4 { background: var(--tang); color: #fff; }
+.cal-d.hj-d { box-shadow: inset 0 0 0 2px var(--ink); }
+.cal-d.fut { opacity: .45; }
+.cal-leg { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: .7rem; color: var(--muted); margin-top: -6px; }
+.cal-leg i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sems { display: grid; gap: 6px; }
+.sem { display: grid; grid-template-columns: 64px 1fr auto; gap: 8px; align-items: center; font-size: .84rem; }
+.sem .tr { height: 8px; background: var(--field); border-radius: 4px; overflow: hidden; }
+.sem .tr i { display: block; height: 100%; background: var(--tang); border-radius: 4px; }
+.sem.agora span:first-child { font-weight: 700; }
+.sem b { font-size: .84rem; }
+.filtro-cat { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: .8rem; font-weight: 600; color: var(--muted); background: none; border: 0; padding: 0 0 10px; }
+.filtro-cat svg { width: 15px; height: 15px; }
+.filtro-cat.on { color: var(--tang); }
+.filtro-row { display: flex; align-items: center; gap: 8px; padding-bottom: 10px; }
+.filtro-row .filtro-cat { padding: 0; }
+.filtro-x { width: auto; flex: none; font: inherit; font-size: .74rem; font-weight: 600; color: var(--muted); background: var(--field); border: 0; border-radius: 999px; padding: 3px 10px; margin: 0; }
 .modo-orc { justify-content: center; }
 .modo-orc .chip { padding: 4px 12px; font-size: .78rem; }
 .swatch { width: 30px; height: 30px; border-radius: 9px; border: 2px solid transparent; }
@@ -430,6 +453,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     <div class="kpis" id="gr-kpis"></div>
     <div class="panel">
       <div class="grp-h"><h2>Por categoria</h2><span class="sub" id="gr-cat-sub"></span></div>
+      <div class="filtro-row"><button class="filtro-cat" type="button" id="gr-filtro"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4-2v-4.5z"/></svg><span>Todas as categorias</span></button><button class="filtro-x" type="button" id="gr-filtro-x" hidden aria-label="Tirar o filtro">✕ tirar filtro</button></div>
       <div id="gr-pizza" class="pizza"></div>
       <p class="sub">Toque numa categoria para ver ela mês a mês.</p>
       <div id="gr-cats" class="bars"></div>
@@ -458,6 +482,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     </div>
     <div class="panel">
       <h2>Neste aparelho</h2>
+      <label class="field"><span>Quanto você ganha por mês de trabalho</span><input type="text" id="op-trab" inputmode="decimal" placeholder="Usa a renda prevista"></label>
+      <p class="sub" style="margin-top:-6px">Serve pra mostrar quanto um gasto vale em dias de trabalho.</p>
       <label class="opt"><input type="checkbox" id="op-oculto"> <span>Abrir com os valores escondidos<small>O Plin sempre abre com R$ •••••. Toque no olhinho do topo pra ver.</small></span></label>
     </div>
     <div class="panel">
@@ -482,7 +508,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.18.1';
+  const VERSAO = '2.19.0';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -1217,8 +1243,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     for (const [dia, ls] of byDay) {
       const dt = new Date(dia + 'T00:00:00Z');
       const gDia = ls.filter((l) => l.tipo === 'gasto').reduce((a, l) => a + l.valor, 0);
-      box.append(h('div', { class: 'dia' }, h('div', { class: 'd' }, h('b', null, String(dt.getUTCDate())), h('small', null, wdF.format(dt).replace('.', ''))),
-        h('div', { class: 'es' }, ls.map(entryEl), gDia ? h('div', { class: 'dia-tot', onclick: () => toastDia(dia, gDia) }, h('span', null, 'Gastou no dia'), h('b', null, '− ' + brl(gDia))) : null)));
+      box.append(h('div', { class: 'dia' }, h('div', { class: 'd', onclick: gDia ? () => toastDia(dia, gDia) : null }, h('b', null, String(dt.getUTCDate())), h('small', null, wdF.format(dt).replace('.', ''))),
+        h('div', { class: 'es' }, ls.map(entryEl), gDia ? h('div', { class: 'dia-tot', onclick: () => toastTrabalho(gDia, dia) }, h('span', null, 'Gastou no dia'), h('b', null, '− ' + brl(gDia))) : null)));
     }
   }
   function entryEl(l) {
@@ -1414,6 +1440,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   let verArq = false;
   function renderNumeros() {
+    if (document.activeElement !== $('op-trab')) $('op-trab').value = cfg.valorTrabalho != null ? centStr(cfg.valorTrabalho) : '';
     for (const b of $('cg-seg').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.k === catTab));
     const chipCat = (c) => h('button', { class: 'chip cat' + (c.arquivada ? ' arq' : ''), style: `--c:${c.cor}`, type: 'button', onclick: () => openCat(catTab, c) }, marca(c), nomeCat(c.nome), c.teto > 0 ? h('small', { class: 'teto-tag' }, 'teto ' + brl(c.teto)) : null);
     const ativas = catsOf(catTab).filter((c) => !c.arquivada), arqs = catsOf(catTab).filter((c) => c.arquivada);
@@ -1435,11 +1462,31 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     for (let m = ks[0]; m <= fim; m = addMonths(m, 1)) ms.push(m);
     return ms;
   }
-  const gastosDe = (ms) => ms.flatMap((m) => (meses[m] || []).filter((l) => l.tipo === 'gasto'));
+  // "Sem viagem" nos gráficos: tira a categoria de viagem das contas (fica salvo neste aparelho)
+  // filtro dos gráficos: categorias escondidas das contas e dos gráficos (fica salvo neste aparelho)
+  let ocultasGraf = new Set();
+  try { ocultasGraf = new Set(JSON.parse(lsGet('plin-graf-ocultas') || '[]')); } catch (e) { /* ok */ }
+  const salvarOcultas = () => lsSet('plin-graf-ocultas', JSON.stringify([...ocultasGraf]));
+  const contaGrafico = (l) => l.tipo === 'gasto' && !ocultasGraf.has(l.cat);
+  function openFiltroGraf() {
+    const grade = h('div', { class: 'chips cat-grade compacta' });
+    const tot = new Map(); for (const m of mesesDoPeriodo()) for (const l of meses[m] || []) if (l.tipo === 'gasto') tot.set(l.cat, (tot.get(l.cat) || 0) + l.valor);
+    const lista = catsOf('gasto').filter((c) => !c.arquivada || ocultasGraf.has(c.id) || tot.get(c.id)).map((c, i) => [c, i]).sort((a, b) => (tot.get(b[0].id) || 0) - (tot.get(a[0].id) || 0) || a[1] - b[1]).map(([c]) => c);
+    const pinta = () => grade.replaceChildren(...lista.map((c) => h('button', { class: 'chip cat' + (ocultasGraf.has(c.id) ? ' arq' : ''), style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(!ocultasGraf.has(c.id)),
+      onclick: () => { if (ocultasGraf.has(c.id)) ocultasGraf.delete(c.id); else ocultasGraf.add(c.id); salvarOcultas(); if (catSel && ocultasGraf.has(catSel)) catSel = null; barSel = null; pinta(); renderGraficos(); } }, marca(c), nomeCat(c.nome))));
+    pinta();
+    sheet('Filtrar os gráficos', h('div', { class: 'stack', style: 'gap:12px' }, h('p', { class: 'sub' }, 'Da que você mais gastou no período pra que menos gastou. Toque numa categoria pra tirar ela das médias e de todos os gráficos. Toque de novo pra voltar.'), grade,
+      h('div', { class: 'row-btns' }, h('button', { class: 'btn alt', type: 'button', onclick: () => { ocultasGraf.clear(); salvarOcultas(); pinta(); renderGraficos(); } }, 'Mostrar todas'))));
+  }
+  const gastosDe = (ms) => ms.flatMap((m) => (meses[m] || []).filter(contaGrafico));
   function nomePer(ms) { return ms.length === 1 ? mLong(ms[0]) : `${cap(mShort(ms[0]))}/${ms[0].slice(2, 4)} a ${mShort(ms[ms.length - 1])}/${ms[ms.length - 1].slice(2, 4)}`; }
 
   function renderGraficos() {
-    for (const b of $('gr-per').querySelectorAll('button')) b.setAttribute('aria-pressed', String(Number(b.dataset.p) === per));
+    for (const b of $('gr-per').querySelectorAll('button[data-p]')) b.setAttribute('aria-pressed', String(Number(b.dataset.p) === per));
+    const ocVal = carregou ? [...ocultasGraf].filter((id) => catsOf('gasto').some((c) => c.id === id)) : [];
+    const nOc = ocVal.length, fb = $('gr-filtro');
+    fb.classList.toggle('on', nOc > 0); $('gr-filtro-x').hidden = !nOc;
+    fb.lastChild.textContent = !nOc ? 'Todas as categorias' : nOc === 1 ? `Sem ${catById('gasto', ocVal[0]).nome}` : `Sem ${nOc} categorias`;
     if (!carregou) return;
     const ms = mesesDoPeriodo();
     const gs = gastosDe(ms);
@@ -1473,7 +1520,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const c = catSel ? catById('gasto', catSel) : null;
     $('gr-mes-t').textContent = c ? `${c.nome} mês a mês` : 'Gastos mês a mês';
     $('gr-limpar').hidden = !c;
-    const data = msBar.map((m) => ({ m, g: (meses[m] || []).filter((l) => l.tipo === 'gasto' && (!catSel || l.cat === catSel)).reduce((a, l) => a + l.valor, 0) }));
+    const data = msBar.map((m) => ({ m, g: (meses[m] || []).filter((l) => contaGrafico(l) && (!catSel || l.cat === catSel)).reduce((a, l) => a + l.valor, 0) }));
     const vals = data.filter((x) => x.g > 0);
     const media = vals.length ? Math.round(vals.reduce((a, x) => a + x.g, 0) / data.length) : 0;
     $('gr-mes-sub').textContent = media ? `Linha tracejada: média de ${brl(media)} por mês nesses ${data.length} meses. Toque numa barra para ver o valor.` : 'Nada nesse período.';
@@ -1519,14 +1566,21 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     if (!ord.length || !(tot > 0)) { box.hidden = true; return; }
     box.hidden = false;
     let fatias = ord.map(([id, v]) => ({ id, v, c: catById('gasto', id) }));
-    if (fatias.length > 7) { const resto = fatias.slice(6); fatias = [...fatias.slice(0, 6), { id: null, v: resto.reduce((a, x) => a + x.v, 0), c: { nome: `Outras (${resto.length})`, cor: '#9a93b8' } }]; }
+    let resto = [];
+    if (fatias.length > 7) { resto = fatias.slice(6); fatias = [...fatias.slice(0, 6), { id: null, outras: true, v: resto.reduce((a, x) => a + x.v, 0), c: { nome: `Outras (${resto.length})`, cor: '#9a93b8' } }]; }
+    const naOutras = !!catSel && resto.some((x) => x.id === catSel);
+    // "Outras": toque abre a lista do que tem dentro; escolher uma categoria lá marca ela nos gráficos
+    const abrirOutras = () => {
+      const sh = sheet('Outras categorias', h('div', { class: 'stack', style: 'gap:6px' }, h('p', { class: 'sub' }, `Juntas são ${brl(resto.reduce((a, x) => a + x.v, 0))}. Toque numa pra ver ela nos gráficos.`),
+        resto.map((x) => h('button', { class: 'en', type: 'button', onclick: () => { sh.close(); catSel = x.id; barSel = null; renderGraficos(); } }, h('span', { class: 't' }, h('span', { class: 'tag' }, marca(x.c), x.c.nome)), h('span', { class: 'v' }, brl(x.v)), h('span', { class: 'meta' }, Math.round(x.v / tot * 100) + '% do total')))));
+    };
     const S = 160, cx = S / 2, R = 76, r = 48;
     const svg = sv('svg', { viewBox: `0 0 ${S} ${S}`, role: 'img', 'aria-label': 'Pizza dos gastos por categoria' });
     const pt = (a, rad) => [cx + rad * Math.sin(a), cx - rad * Math.cos(a)];
     let a0 = 0;
     for (const f of fatias) {
       const frac = f.v / tot, a1 = a0 + frac * Math.PI * 2;
-      const dim = catSel && f.id !== catSel;
+      const dim = catSel && f.id !== catSel && !(f.outras && naOutras);
       const attrs = { fill: f.c.cor, opacity: dim ? .3 : 1, stroke: 'var(--panel)', 'stroke-width': 2, 'stroke-linejoin': 'round' };
       let el;
       if (frac >= .9999) el = sv('path', Object.assign({ d: `M${cx},${cx - R}A${R},${R} 0 1 1 ${cx - .01},${cx - R}Z M${cx},${cx - r}A${r},${r} 0 1 0 ${cx + .01},${cx - r}Z`, 'fill-rule': 'evenodd' }, attrs));
@@ -1537,13 +1591,14 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       }
       el.append(sv('title', {}, `${f.c.nome}: ${brl(f.v)} (${Math.round(frac * 100)}%)`));
       if (f.id) el.addEventListener('click', () => { catSel = catSel === f.id ? null : f.id; barSel = null; renderGraficos(); });
+      else if (f.outras) el.addEventListener('click', abrirOutras);
       svg.append(el);
       a0 = a1;
     }
-    const foco = catSel ? fatias.find((f) => f.id === catSel) : null;
+    const foco = catSel ? (fatias.find((f) => f.id === catSel) || resto.find((f) => f.id === catSel)) : null;
     svg.append(sv('text', { x: cx, y: cx - 4, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'var(--ink)' }, foco ? Math.round(foco.v / tot * 100) + '%' : brl(tot).replace('R$', '').trim()));
     svg.append(sv('text', { x: cx, y: cx + 13, 'text-anchor': 'middle', 'font-size': 9.5, fill: 'var(--muted)', 'font-weight': 600 }, foco ? (foco.c.nome.length > 14 ? foco.c.nome.slice(0, 13) + '…' : foco.c.nome) : 'reais gastos'));
-    const leg = h('div', { class: 'leg' }, fatias.map((f) => h('button', { type: 'button', 'aria-pressed': String(!!f.id && catSel === f.id), disabled: !f.id, onclick: () => { if (!f.id) return; catSel = catSel === f.id ? null : f.id; barSel = null; renderGraficos(); } },
+    const leg = h('div', { class: 'leg' }, fatias.map((f) => h('button', { type: 'button', 'aria-pressed': String((!!f.id && catSel === f.id) || (!!f.outras && naOutras)), onclick: () => { if (f.outras) { abrirOutras(); return; } catSel = catSel === f.id ? null : f.id; barSel = null; renderGraficos(); } },
       h('i', { style: `background:${f.c.cor}` }), h('span', null, f.c.nome), h('small', null, Math.round(f.v / tot * 100) + '%'))));
     box.replaceChildren(svg, leg);
   }
@@ -1595,6 +1650,46 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     sheet(passou < ultimo ? 'Como o mês vai fechar' : 'Como o mês fechou', h('div', { class: 'stack conta', style: 'gap:14px' }, linhas));
   }
 
+  // detalhe do mês (toque no Gastou): calendário colorido pelo gasto de cada dia, total por semana e o mesmo mês do ano passado
+  function detalheMes(d) {
+    const ult = diasNoMes(mes), hoje = todayISO();
+    const porDia = new Map();
+    for (const l of d.ls) if (l.tipo === 'gasto' && !l.origem) porDia.set(l.data, (porDia.get(l.data) || 0) + l.valor);
+    const mx = Math.max(1, ...porDia.values());
+    const iso = (i) => mes + '-' + String(i).padStart(2, '0');
+    const w0 = (new Date(iso(1) + 'T00:00:00Z').getUTCDay() + 6) % 7; // 0 = segunda
+    const nivel = (v) => (!v ? 0 : v <= mx * 0.15 ? 1 : v <= mx * 0.4 ? 2 : v <= mx * 0.7 ? 3 : 4);
+    const cal = h('div', { class: 'cal' }, ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'].map((x) => h('span', { class: 'cal-h' }, x)),
+      Array.from({ length: w0 }, () => h('span')),
+      Array.from({ length: ult }, (_, i) => {
+        const dia = iso(i + 1), v = porDia.get(dia) || 0, fut = dia > hoje;
+        return h('button', { type: 'button', class: `cal-d n${nivel(v)}` + (dia === hoje ? ' hj-d' : '') + (fut ? ' fut' : ''), 'aria-label': `${dmCurto(dia)}: ${brlReal(v)}`,
+          onclick: () => { const n = d.ls.filter((l) => l.tipo === 'gasto' && !l.origem && l.data === dia).length; toast(fut ? `${dmCurto(dia)}: ainda não chegou.` : !v ? `${dmCurto(dia)}: nenhum gasto do Livre.` : `${dmCurto(dia)}: ${brl(v)} em ${n} ${n === 1 ? 'gasto' : 'gastos'}.`); } }, String(i + 1));
+      }));
+    // semanas de segunda a domingo, só com os dias deste mês
+    const semanas = []; let ini = 1;
+    while (ini <= ult) {
+      const w = (new Date(iso(ini) + 'T00:00:00Z').getUTCDay() + 6) % 7;
+      const fim = Math.min(ult, ini + 6 - w);
+      let v = 0; for (let i = ini; i <= fim; i++) v += porDia.get(iso(i)) || 0;
+      semanas.push({ ini, fim, v, agora: hoje >= iso(ini) && hoje <= iso(fim) });
+      ini = fim + 1;
+    }
+    const mxs = Math.max(1, ...semanas.map((x) => x.v));
+    const sems = h('div', { class: 'sems' }, semanas.map((x) => h('div', { class: 'sem' + (x.agora ? ' agora' : '') },
+      h('span', null, x.ini === x.fim ? `dia ${x.ini}` : `${x.ini} a ${x.fim}`), h('span', { class: 'tr' }, h('i', { style: `width:${x.v / mxs * 100}%` })), h('b', { class: 'num' }, brl(x.v)))));
+    // mesmo mês do ano passado (se o mês ainda está correndo, compara até o mesmo dia)
+    const ap = addMonths(mes, -12), parcial = mes === ymOf(hoje), corte = Number(hoje.slice(8, 10));
+    const tot = d.gastou + d.gastoCx;
+    const vAp = (meses[ap] || []).filter((l) => l.tipo === 'gasto' && (!parcial || Number(l.data.slice(8, 10)) <= corte)).reduce((a, l) => a + l.valor, 0);
+    const pc = pct(tot, vAp);
+    const nomeAp = mLong(ap).toLowerCase();
+    const comp = !(meses[ap] || []).length ? `Não tem nada anotado em ${nomeAp} pra comparar.`
+      : `${parcial ? `Até dia ${corte} de ${nomeAp}` : `Em ${nomeAp}`} você gastou ${brl(vAp)}` + (pc === null ? '.' : pc === 0 ? ', o mesmo que agora.' : `. Agora está ${Math.abs(pc)}% ${pc > 0 ? 'acima' : 'abaixo'}.`);
+    return [cal, h('div', { class: 'cal-leg' }, h('span', null, 'menos'), [1, 2, 3, 4].map((n) => h('i', { class: 'n' + n })), h('span', null, 'mais')),
+      h('div', { class: 'label' }, 'Por semana'), sems,
+      h('div', { class: 'label' }, 'Ano passado'), h('p', { class: 'sub', style: 'margin-top:-6px' }, comp)];
+  }
   // 2. Entrou / Gastou / Guardou: o detalhe de cada linha
   function openDetalhe(k) {
     if (!carregou) return;
@@ -1609,7 +1704,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       const byCx = new Map(); for (const l of ls) if (l.tipo === 'gasto' && l.origem) byCx.set(l.origem, (byCx.get(l.origem) || 0) + l.valor);
       const tot = d.gastou + d.gastoCx;
       titulo = 'Pra onde foi';
-      corpo = tot ? [h('div', { class: 'ledger' },
+      corpo = tot ? [...detalheMes(d), h('div', { class: 'label' }, 'Por categoria'), h('div', { class: 'ledger' },
         [...by.entries()].sort((a, b) => b[1] - a[1]).map(([id, v]) => linhaE(`${catById('gasto', id).nome} (${Math.round(v / tot * 100)}%)`, v)),
         d.gastoCx ? linhaE('Saiu de caixinhas', d.gastoCx) : null,
         [...byCx.entries()].map(([id, v]) => subE(nomeCx(id), v)),
@@ -1729,7 +1824,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const n = ms.length, hoje = todayISO(), parcial = ms[n - 1] === ymOf(hoje);
     const ant = ms.map((m) => addMonths(m, -n));
     const corte = (m, l) => !parcial || m !== ant[n - 1] || Number(l.data.slice(8, 10)) <= Number(hoje.slice(8, 10));
-    const va = ant.reduce((a, m) => a + (meses[m] || []).filter((l) => l.tipo === 'gasto' && l.cat === top[0] && corte(m, l)).reduce((s, l) => s + l.valor, 0), 0);
+    const va = ant.reduce((a, m) => a + (meses[m] || []).filter((l) => contaGrafico(l) && l.cat === top[0] && corte(m, l)).reduce((s, l) => s + l.valor, 0), 0);
     const nomeAnt = n === 1 ? (parcial ? `até dia ${Number(hoje.slice(8, 10))} de ${mShort(ant[0])}` : `em ${mShort(ant[0])}`) : `nos ${n} meses antes`;
     const p = pct(v, va);
     toast(!va ? `${c.nome}: ${brl(v)}. ${cap(nomeAnt)} foi zero.` : `${c.nome}: ${brl(v)}, contra ${brl(va)} ${nomeAnt}` + (p === 0 ? ', o mesmo.' : ` (${Math.abs(p)}% ${p > 0 ? 'a mais' : 'a menos'}).`), null, 6000);
@@ -1779,6 +1874,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.19.0', 'Tocando no Gastou: calendário do mês com cada dia colorido pelo gasto, total de cada semana e comparação com o mesmo mês do ano passado. Filtro nos Gráficos pra esconder categorias (Viagem, por exemplo). E um segredo: toque no valor de um gasto.'],
     ['2.18.1', 'Categorias em grade, com o ícone grande e o nome embaixo, no Anotar e na Config (mais compacta lá, com as arquivadas recolhidas). Ícones maiores no resto do app.'],
     ['2.18.0', 'Ícones de linha nas categorias (dá pra trocar o ícone em Números > Categorias), opção de ver o orçamento por semana em vez de por dia (dentro da conta do "Pode gastar"), segurar um lançamento do extrato pra anotar igual de novo, atalho "Anotar gasto" segurando o ícone do app e opção de sempre abrir com os valores escondidos.'],
     ['2.17.1', 'Mandar backup agora abre o Compartilhar de verdade (o arquivo vai como .txt, e o Importar aceita .txt e .json).'],
@@ -1946,12 +2042,24 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const txt = [...ids].map(cxById).filter(Boolean).map((cx) => `${cx.nome} ficou com ${brl(saldoEst(cx))}`);
     return txt.length ? ' ' + txt.join(', ') + '.' : '';
   }
+  // quanto um gasto vale em dias de trabalho: valor por mês ÷ dias úteis (segunda a sexta) do mês do gasto
+  const valorTrabalho = () => cfg.valorTrabalho != null ? cfg.valorTrabalho : (cfg.rendaPrevista || 0);
+  function diasUteis(ym) { let n = 0; for (let i = 1; i <= diasNoMes(ym); i++) { const w = new Date(ym + '-' + String(i).padStart(2, '0') + 'T00:00:00Z').getUTCDay(); if (w > 0 && w < 6) n++; } return n; }
+  function toastTrabalho(v, data) {
+    const vt = valorTrabalho(); if (!(vt > 0) || !(v > 0)) return;
+    const ym = ymOf(data || todayISO()), du = diasUteis(ym), dia = vt / du, x = v / dia;
+    const n1 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+    const horas = Math.round(x * 8 * 10) / 10;
+    toast(x < 1 ? `Isso é ${n1.format(horas)} ${horas === 1 ? 'hora' : 'horas'} de trabalho (um dia vale ${brl(Math.round(dia))}).` : `Isso é ${n1.format(x)} ${x < 1.05 ? 'dia' : 'dias'} de trabalho (um dia vale ${brl(Math.round(dia))}, com ${du} dias úteis em ${mShort(ym)}).`, null, 5000);
+  }
   function openLanc(l) {
     if (bloqueado()) return;
     const edit = !!l && !l.novo;
     const st = l ? { ...l } : { tipo: 'gasto', cat: '', data: todayISO(), origem: '', caixinha: (cfg.caixinhas[0] || {}).id };
     let amt = l && l.valor ? centStr(l.valor).replace(/\./g, '') : '';
     const amtEl = h('b', null, '0,00');
+    // tocar no valor (anotando ou editando um gasto) mostra quanto ele vale em horas de trabalho
+    amtEl.addEventListener('click', () => { if (st.tipo === 'gasto') toastTrabalho(emReais(), data.value); });
     const paintAmt = () => { amtEl.textContent = amt || '0,00'; amtEl.className = amt ? '' : 'zero'; };
     const press = (k) => {
       if (k === 'del') amt = amt.slice(0, -1);
@@ -2555,7 +2663,9 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   $('rc-new').addEventListener('click', () => openRec());
   $('af-new').addEventListener('click', () => openAporte());
   $('cg-new').addEventListener('click', () => openCat(catTab));
-  $('gr-per').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { per = Number(b.dataset.p); barSel = null; renderGraficos(); } });
+  $('gr-filtro').addEventListener('click', openFiltroGraf);
+  $('gr-filtro-x').addEventListener('click', () => { ocultasGraf.clear(); salvarOcultas(); barSel = null; renderGraficos(); toast('Mostrando todas as categorias.'); });
+  $('gr-per').addEventListener('click', (e) => { const b = e.target.closest('button[data-p]'); if (b) { per = Number(b.dataset.p); barSel = null; renderGraficos(); } });
   $('gr-limpar').addEventListener('click', () => { catSel = null; barSel = null; renderGraficos(); });
   $('cg-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { catTab = b.dataset.k; renderNumeros(); } });
   for (const [k] of PLANO) $('cfg-' + k).addEventListener('input', somaCfg);
@@ -2567,6 +2677,13 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     cfg.divisaoDesde = $('cfg-desde').value || '';
     document.activeElement && document.activeElement.blur();
     render(); await salvarCfg(); toast('Divisão salva.');
+  });
+  $('op-trab').addEventListener('change', async (e) => {
+    if (bloqueado()) return;
+    const v = e.target.value.trim() ? parseCent(e.target.value) : null;
+    if (v === null) delete cfg.valorTrabalho; else cfg.valorTrabalho = v > 0 ? v : 0;
+    e.target.value = cfg.valorTrabalho != null ? centStr(cfg.valorTrabalho) : '';
+    await salvarCfg(); toast('Salvo.');
   });
   $('op-oculto').checked = lsGet('plin-abrir-oculto') === '1';
   $('op-oculto').addEventListener('change', (e) => { lsSet('plin-abrir-oculto', e.target.checked ? '1' : '0'); toast(e.target.checked ? 'Pronto: o Plin vai abrir com os valores escondidos.' : 'O Plin vai abrir como você deixou da última vez.'); });
