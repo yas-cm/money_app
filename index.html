@@ -182,6 +182,9 @@ svg.ic { width: 17px; height: 17px; flex: none; display: inline-block; }
 .filtro-cat { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: .8rem; font-weight: 600; color: var(--muted); background: none; border: 0; padding: 0 0 10px; }
 .filtro-cat svg { width: 15px; height: 15px; }
 .filtro-cat.on { color: var(--tang); }
+.filtro-row { display: flex; align-items: center; gap: 8px; padding-bottom: 10px; }
+.filtro-row .filtro-cat { padding: 0; }
+.filtro-x { width: auto; flex: none; font: inherit; font-size: .74rem; font-weight: 600; color: var(--muted); background: var(--field); border: 0; border-radius: 999px; padding: 3px 10px; margin: 0; }
 .modo-orc { justify-content: center; }
 .modo-orc .chip { padding: 4px 12px; font-size: .78rem; }
 .swatch { width: 30px; height: 30px; border-radius: 9px; border: 2px solid transparent; }
@@ -450,7 +453,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     <div class="kpis" id="gr-kpis"></div>
     <div class="panel">
       <div class="grp-h"><h2>Por categoria</h2><span class="sub" id="gr-cat-sub"></span></div>
-      <button class="filtro-cat" type="button" id="gr-filtro"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4-2v-4.5z"/></svg><span>Todas as categorias</span></button>
+      <div class="filtro-row"><button class="filtro-cat" type="button" id="gr-filtro"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4-2v-4.5z"/></svg><span>Todas as categorias</span></button><button class="filtro-x" type="button" id="gr-filtro-x" hidden aria-label="Tirar o filtro">✕ tirar filtro</button></div>
       <div id="gr-pizza" class="pizza"></div>
       <p class="sub">Toque numa categoria para ver ela mês a mês.</p>
       <div id="gr-cats" class="bars"></div>
@@ -1467,10 +1470,12 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   const contaGrafico = (l) => l.tipo === 'gasto' && !ocultasGraf.has(l.cat);
   function openFiltroGraf() {
     const grade = h('div', { class: 'chips cat-grade compacta' });
-    const pinta = () => grade.replaceChildren(...catsOf('gasto').filter((c) => !c.arquivada || ocultasGraf.has(c.id)).map((c) => h('button', { class: 'chip cat' + (ocultasGraf.has(c.id) ? ' arq' : ''), style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(!ocultasGraf.has(c.id)),
+    const tot = new Map(); for (const m of mesesDoPeriodo()) for (const l of meses[m] || []) if (l.tipo === 'gasto') tot.set(l.cat, (tot.get(l.cat) || 0) + l.valor);
+    const lista = catsOf('gasto').filter((c) => !c.arquivada || ocultasGraf.has(c.id) || tot.get(c.id)).map((c, i) => [c, i]).sort((a, b) => (tot.get(b[0].id) || 0) - (tot.get(a[0].id) || 0) || a[1] - b[1]).map(([c]) => c);
+    const pinta = () => grade.replaceChildren(...lista.map((c) => h('button', { class: 'chip cat' + (ocultasGraf.has(c.id) ? ' arq' : ''), style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(!ocultasGraf.has(c.id)),
       onclick: () => { if (ocultasGraf.has(c.id)) ocultasGraf.delete(c.id); else ocultasGraf.add(c.id); salvarOcultas(); if (catSel && ocultasGraf.has(catSel)) catSel = null; barSel = null; pinta(); renderGraficos(); } }, marca(c), nomeCat(c.nome))));
     pinta();
-    sheet('Filtrar os gráficos', h('div', { class: 'stack', style: 'gap:12px' }, h('p', { class: 'sub' }, 'Toque numa categoria pra tirar ela das médias e de todos os gráficos. Toque de novo pra voltar.'), grade,
+    sheet('Filtrar os gráficos', h('div', { class: 'stack', style: 'gap:12px' }, h('p', { class: 'sub' }, 'Da que você mais gastou no período pra que menos gastou. Toque numa categoria pra tirar ela das médias e de todos os gráficos. Toque de novo pra voltar.'), grade,
       h('div', { class: 'row-btns' }, h('button', { class: 'btn alt', type: 'button', onclick: () => { ocultasGraf.clear(); salvarOcultas(); pinta(); renderGraficos(); } }, 'Mostrar todas'))));
   }
   const gastosDe = (ms) => ms.flatMap((m) => (meses[m] || []).filter(contaGrafico));
@@ -1480,7 +1485,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     for (const b of $('gr-per').querySelectorAll('button[data-p]')) b.setAttribute('aria-pressed', String(Number(b.dataset.p) === per));
     const ocVal = carregou ? [...ocultasGraf].filter((id) => catsOf('gasto').some((c) => c.id === id)) : [];
     const nOc = ocVal.length, fb = $('gr-filtro');
-    fb.classList.toggle('on', nOc > 0);
+    fb.classList.toggle('on', nOc > 0); $('gr-filtro-x').hidden = !nOc;
     fb.lastChild.textContent = !nOc ? 'Todas as categorias' : nOc === 1 ? `Sem ${catById('gasto', ocVal[0]).nome}` : `Sem ${nOc} categorias`;
     if (!carregou) return;
     const ms = mesesDoPeriodo();
@@ -2651,6 +2656,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   $('af-new').addEventListener('click', () => openAporte());
   $('cg-new').addEventListener('click', () => openCat(catTab));
   $('gr-filtro').addEventListener('click', openFiltroGraf);
+  $('gr-filtro-x').addEventListener('click', () => { ocultasGraf.clear(); salvarOcultas(); barSel = null; renderGraficos(); toast('Mostrando todas as categorias.'); });
   $('gr-per').addEventListener('click', (e) => { const b = e.target.closest('button[data-p]'); if (b) { per = Number(b.dataset.p); barSel = null; renderGraficos(); } });
   $('gr-limpar').addEventListener('click', () => { catSel = null; barSel = null; renderGraficos(); });
   $('cg-seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { catTab = b.dataset.k; renderNumeros(); } });
