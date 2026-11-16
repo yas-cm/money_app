@@ -1238,8 +1238,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     for (const [dia, ls] of byDay) {
       const dt = new Date(dia + 'T00:00:00Z');
       const gDia = ls.filter((l) => l.tipo === 'gasto').reduce((a, l) => a + l.valor, 0);
-      box.append(h('div', { class: 'dia' }, h('div', { class: 'd' }, h('b', null, String(dt.getUTCDate())), h('small', null, wdF.format(dt).replace('.', ''))),
-        h('div', { class: 'es' }, ls.map(entryEl), gDia ? h('div', { class: 'dia-tot', onclick: () => toastDia(dia, gDia) }, h('span', null, 'Gastou no dia'), h('b', null, '− ' + brl(gDia))) : null)));
+      box.append(h('div', { class: 'dia' }, h('div', { class: 'd', onclick: gDia ? () => toastDia(dia, gDia) : null }, h('b', null, String(dt.getUTCDate())), h('small', null, wdF.format(dt).replace('.', ''))),
+        h('div', { class: 'es' }, ls.map(entryEl), gDia ? h('div', { class: 'dia-tot', onclick: () => toastTrabalho(gDia, dia) }, h('span', null, 'Gastou no dia'), h('b', null, '− ' + brl(gDia))) : null)));
     }
   }
   function entryEl(l) {
