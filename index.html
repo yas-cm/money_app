@@ -2033,7 +2033,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const st = l ? { ...l } : { tipo: 'gasto', cat: '', data: todayISO(), origem: '', caixinha: (cfg.caixinhas[0] || {}).id };
     let amt = l && l.valor ? centStr(l.valor).replace(/\./g, '') : '';
     const amtEl = h('b', null, '0,00');
-    if (edit && l.tipo === 'gasto') amtEl.addEventListener('click', () => toastTrabalho(l.valor, l.data));
+    // tocar no valor (anotando ou editando um gasto) mostra quanto ele vale em horas de trabalho
+    amtEl.addEventListener('click', () => { if (st.tipo === 'gasto') toastTrabalho(emReais(), data.value); });
     const paintAmt = () => { amtEl.textContent = amt || '0,00'; amtEl.className = amt ? '' : 'zero'; };
     const press = (k) => {
       if (k === 'del') amt = amt.slice(0, -1);
