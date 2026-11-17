@@ -85,7 +85,7 @@ button { cursor: pointer; }
 .ledger b { font-variant-numeric: tabular-nums; }
 .dia { display: grid; grid-template-columns: 3.1rem minmax(0, 1fr); gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
 .dia:first-child { border-top: 0; padding-top: 2px; }
-.dia .d { display: grid; justify-items: center; align-content: start; line-height: 1; padding-top: 3px; }
+.dia .d { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; cursor: pointer; display: grid; justify-items: center; align-content: start; line-height: 1; padding-top: 3px; }
 .dia .d b { font-family: var(--display); font-size: 1.35rem; }
 .dia .d small { font-size: .7rem; color: var(--muted); margin-top: 3px; }
 .dia .es { display: grid; gap: 2px; min-width: 0; }
@@ -171,6 +171,10 @@ svg.ic { width: 17px; height: 17px; flex: none; display: inline-block; }
 .cal-d.n4, .cal-leg .n4 { background: var(--tang); color: #fff; }
 .cal-d.hj-d { box-shadow: inset 0 0 0 2px var(--ink); }
 .cal-d.fut { opacity: .45; }
+.cal-d.sel { outline: 2.5px solid var(--ink); outline-offset: 1px; }
+.cal-dia { display: grid; gap: 6px; padding: 10px; border-radius: 14px; background: var(--field); }
+.cal-dia-h { display: flex; justify-content: space-between; font-size: .88rem; }
+.cal-dia .sub { margin: 0; }
 .cal-leg { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: .7rem; color: var(--muted); margin-top: -6px; }
 .cal-leg i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 .sems { display: grid; gap: 6px; }
@@ -508,7 +512,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.19.0';
+  const VERSAO = '2.19.1';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -1243,7 +1247,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     for (const [dia, ls] of byDay) {
       const dt = new Date(dia + 'T00:00:00Z');
       const gDia = ls.filter((l) => l.tipo === 'gasto').reduce((a, l) => a + l.valor, 0);
-      box.append(h('div', { class: 'dia' }, h('div', { class: 'd', onclick: gDia ? () => toastDia(dia, gDia) : null }, h('b', null, String(dt.getUTCDate())), h('small', null, wdF.format(dt).replace('.', ''))),
+      box.append(h('div', { class: 'dia' }, h('div', { class: 'd', onclick: () => (gDia ? toastDia(dia, gDia) : toast('Sem gastos nesse dia.')) }, h('b', null, String(dt.getUTCDate())), h('small', null, wdF.format(dt).replace('.', ''))),
         h('div', { class: 'es' }, ls.map(entryEl), gDia ? h('div', { class: 'dia-tot', onclick: () => toastTrabalho(gDia, dia) }, h('span', null, 'Gastou no dia'), h('b', null, '− ' + brl(gDia))) : null)));
     }
   }
@@ -1664,8 +1668,21 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       Array.from({ length: ult }, (_, i) => {
         const dia = iso(i + 1), v = porDia.get(dia) || 0, fut = dia > hoje;
         return h('button', { type: 'button', class: `cal-d n${nivel(v)}` + (dia === hoje ? ' hj-d' : '') + (fut ? ' fut' : ''), 'aria-label': `${dmCurto(dia)}: ${brlReal(v)}`,
-          onclick: () => { const n = d.ls.filter((l) => l.tipo === 'gasto' && !l.origem && l.data === dia).length; toast(fut ? `${dmCurto(dia)}: ainda não chegou.` : !v ? `${dmCurto(dia)}: nenhum gasto do Livre.` : `${dmCurto(dia)}: ${brl(v)} em ${n} ${n === 1 ? 'gasto' : 'gastos'}.`); } }, String(i + 1));
+          onclick: (e) => verDia(dia, e.currentTarget) }, String(i + 1));
       }));
+    // dia escolhido no calendário: os gastos dele aparecem logo embaixo (toque num gasto abre ele)
+    const diaBox = h('div', { class: 'cal-dia', hidden: true });
+    let diaSel = null;
+    function verDia(dia, btn) {
+      for (const b of cal.querySelectorAll('.cal-d.sel')) b.classList.remove('sel');
+      if (diaSel === dia) { diaSel = null; diaBox.hidden = true; return; }
+      diaSel = dia; btn.classList.add('sel'); diaBox.hidden = false;
+      const gs = d.ls.filter((l) => l.tipo === 'gasto' && l.data === dia).sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
+      const t = gs.filter((l) => !l.origem).reduce((a, l) => a + l.valor, 0);
+      const wd = cap(new Intl.DateTimeFormat('pt-BR', { weekday: 'long', timeZone: 'UTC' }).format(new Date(dia + 'T00:00:00Z')));
+      diaBox.replaceChildren(h('div', { class: 'cal-dia-h' }, h('b', null, `${wd}, ${dmCurto(dia)}`), gs.length ? h('span', { class: 'num' }, brl(t)) : null),
+        ...(gs.length ? gs.map(entryEl) : [h('p', { class: 'sub' }, dia > hoje ? 'Esse dia ainda não chegou.' : 'Sem gastos nesse dia.')]));
+    }
     // semanas de segunda a domingo, só com os dias deste mês
     const semanas = []; let ini = 1;
     while (ini <= ult) {
@@ -1686,7 +1703,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const nomeAp = mLong(ap).toLowerCase();
     const comp = !(meses[ap] || []).length ? `Não tem nada anotado em ${nomeAp} pra comparar.`
       : `${parcial ? `Até dia ${corte} de ${nomeAp}` : `Em ${nomeAp}`} você gastou ${brl(vAp)}` + (pc === null ? '.' : pc === 0 ? ', o mesmo que agora.' : `. Agora está ${Math.abs(pc)}% ${pc > 0 ? 'acima' : 'abaixo'}.`);
-    return [cal, h('div', { class: 'cal-leg' }, h('span', null, 'menos'), [1, 2, 3, 4].map((n) => h('i', { class: 'n' + n })), h('span', null, 'mais')),
+    return [cal, diaBox, h('div', { class: 'cal-leg' }, h('span', null, 'menos'), [1, 2, 3, 4].map((n) => h('i', { class: 'n' + n })), h('span', null, 'mais')),
       h('div', { class: 'label' }, 'Por semana'), sems,
       h('div', { class: 'label' }, 'Ano passado'), h('p', { class: 'sub', style: 'margin-top:-6px' }, comp)];
   }
@@ -1874,6 +1891,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.19.1', 'No calendário do mês, tocar num dia mostra os gastos daquele dia logo embaixo. No extrato, tocar num dia sem gastos avisa "Sem gastos nesse dia" (e não seleciona mais o texto).'],
     ['2.19.0', 'Tocando no Gastou: calendário do mês com cada dia colorido pelo gasto, total de cada semana e comparação com o mesmo mês do ano passado. Filtro nos Gráficos pra esconder categorias (Viagem, por exemplo). E um segredo: toque no valor de um gasto.'],
     ['2.18.1', 'Categorias em grade, com o ícone grande e o nome embaixo, no Anotar e na Config (mais compacta lá, com as arquivadas recolhidas). Ícones maiores no resto do app.'],
     ['2.18.0', 'Ícones de linha nas categorias (dá pra trocar o ícone em Números > Categorias), opção de ver o orçamento por semana em vez de por dia (dentro da conta do "Pode gastar"), segurar um lançamento do extrato pra anotar igual de novo, atalho "Anotar gasto" segurando o ícone do app e opção de sempre abrir com os valores escondidos.'],
