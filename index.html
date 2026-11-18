@@ -109,6 +109,13 @@ button { cursor: pointer; }
 .tile .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile .sv { font-family: var(--display); font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
 .tile .sub { font-size: .76rem; }
+.tile { align-content: start; }
+.tile .meta-l b { color: var(--ink); font-weight: 600; }
+.tile .so-t { display: inline-block; margin-left: 6px; padding: 1px 7px; border: 1px solid var(--line); border-radius: 999px; font-size: .72rem; color: var(--muted); cursor: pointer; }
+.tile .mais-t { justify-self: start; font-size: .76rem; font-weight: 600; color: var(--tang); padding: 4px 0 0; cursor: pointer; }
+.tile .extra { display: grid; gap: 4px; padding-top: 6px; margin-top: 2px; border-top: 1px dashed var(--line); }
+.tile .pt { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; font-size: .76rem; color: var(--muted); }
+.tile .pt b { color: var(--ink); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 .ribbon { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 2px; background: var(--field); }
 .ribbon i { display: block; height: 100%; }
 .slice { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
@@ -278,6 +285,20 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 .ap .v { font-variant-numeric: tabular-nums; font-size: .86rem; white-space: nowrap; }
 .ap .track { grid-column: 1 / -1; height: 6px; }
 .ap .sub { grid-column: 1 / -1; font-size: .76rem; }
+.mais { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.mais > summary { list-style: none; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 600; font-size: .92rem; }
+.mais > summary::-webkit-details-marker { display: none; }
+.mais > summary::after { content: ''; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); margin-right: 4px; transition: transform .2s; }
+.mais[open] > summary::after { transform: rotate(-135deg); }
+.mais[open] > summary { margin-bottom: 12px; }
+.mais > .stack { gap: 12px; }
+.field textarea { width: 100%; min-width: 0; background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: .9rem; line-height: 1.45; color: inherit; resize: vertical; }
+.cf-row { display: grid; grid-template-columns: 1fr 120px; gap: 4px 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.cf-row:last-child { border-bottom: 0; }
+.cf-row input { width: 100%; min-width: 0; background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; text-align: right; }
+.cf-row .sub { grid-column: 1 / -1; }
+#cx-total { cursor: pointer; }
+.linkish { background: none; border: 0; padding: 0; color: var(--tang); font: inherit; text-decoration: underline; cursor: pointer; }
 .padrao summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; }
 .padrao summary::-webkit-details-marker { display: none; }
 .padrao summary > span:first-child { display: grid; gap: 2px; }
@@ -512,7 +533,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.19.1';
+  const VERSAO = '2.20.0';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -836,16 +857,199 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   const saldoEst = (cx) => saldoCx(cx) + rendCx(cx);
   const rendeTxt = (r) => (r.tipo === 'cdi' ? `${n2.format(r.taxa).replace(/,00$/, '')}% do CDI` : r.tipo === 'pre' ? `${n2.format(r.taxa).replace(/,00$/, '')}% ao ano` : 'não rende');
 
+  // ---------- 2.20.0: líquido (imposto de renda), partes que liberam, meta com prazo, conferir com o banco ----------
+  // IR de renda fixa: 22,5% até 180 dias, 20% até 360, 17,5% até 720, 15% depois
+  const aliqIR = (dias) => (dias <= 180 ? 22.5 : dias <= 360 ? 20 : dias <= 720 ? 17.5 : 15);
+  const pctTxt = (x) => String(x).replace('.', ',');
+  const diasEntre = (a, b) => Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000);
+  const fmtD = (iso) => iso.split('-').reverse().join('/');
+  // o que sai livre de imposto, aprox.: com "quanto aplicou" usa saldo − aplicado; sem isso, só o rendimento que o Plin calculou
+  function liquidoCx(cx, rd) {
+    if (rd === undefined) rd = rendCx(cx);
+    const bruto = saldoCx(cx) + rd;
+    let rend = 0, desde = '';
+    if (cx.aplicado > 0) {
+      let inv = cx.aplicado;
+      for (const l of all()) if (contaNoSaldo(l, cx)) inv += movCx(l, cx.id);
+      rend = Math.max(0, bruto - inv); desde = cx.aplicadoEm || inicioRend(cx);
+    } else if (rendeDe(cx).tipo !== 'nao') { rend = Math.max(0, rd); desde = inicioRend(cx); }
+    const aliq = rend ? aliqIR(desde ? Math.max(0, diasEntre(desde, todayISO())) : 0) : 0;
+    const ir = Math.round(rend * aliq / 100);
+    return { bruto, rend, ir, aliq, liq: bruto - ir };
+  }
+  // troca o saldo pelo do banco: a conta recomeça dali (e o "quanto aplicou" acompanha o que entrou e saiu)
+  function rebaseCx(cx, s) {
+    const movLiq = all().filter((l) => contaNoSaldo(l, cx)).reduce((a, l) => a + movCx(l, cx.id), 0);
+    const o = { saldoBase: s, baseEm: Date.now(), rendeDesde: todayISO() };
+    if (cx.aplicado > 0) o.aplicado = Math.max(0, cx.aplicado + movLiq);
+    return Object.assign({}, cx, o);
+  }
+  // partes de uma caixinha: valor, taxa (% do CDI) e quando dá pra resgatar sem perder a taxa
+  function lerPartes(txt, antigas) {
+    const out = [], erros = [];
+    for (const linha of String(txt || '').split(/\n/)) {
+      const t = linha.trim(); if (!t) continue;
+      const tk = t.replace(/[·|;]/g, ' ').replace(/r\$/gi, ' ').split(/\s+/).filter(Boolean);
+      let valor = null, taxa = null, resgate = '';
+      for (const x of tk) {
+        const dm = x.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+        if (dm) { let y = dm[3] ? +dm[3] : +todayISO().slice(0, 4); if (y < 100) y += 2000; resgate = `${y}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}`; continue; }
+        if (/%$/.test(x)) { const v = Number(x.replace('%', '').replace(',', '.')); if (v > 0) taxa = v; continue; }
+        if (/^[\d.,]+$/.test(x)) { if (valor === null) { const c = parseCent(x); if (c > 0) valor = c; } else if (taxa === null) { const v = Number(x.replace(',', '.')); if (v > 0) taxa = v; } }
+      }
+      if (!valor) { erros.push(t); continue; }
+      const p = { valor, taxa: taxa || 100, resgate };
+      const old = (antigas || []).find((a) => a.valor === p.valor && (a.resgate || '') === p.resgate);
+      if (old && old.visto) p.visto = true;
+      out.push(p);
+    }
+    return { partes: out, erros };
+  }
+  const partesTxt = (ps) => (ps || []).map((p) => `${centStr(p.valor)} ${pctTxt(p.taxa)}% ${p.resgate ? fmtD(p.resgate) : 'imediato'}`).join('\n');
+  const proxParte = (cx) => (cx.partes || []).filter((p) => p.resgate && p.resgate >= todayISO()).sort((a, b) => a.resgate.localeCompare(b.resgate))[0];
+  function ultDiaUtil(ym) { let d = ym + '-' + String(diasNoMes(ym)).padStart(2, '0'); while (!diaUtil(d)) d = addDia(d, -1); return d; }
+  const mesesAte = (ym) => (+ym.slice(0, 4) * 12 + +ym.slice(5, 7)) - (+todayISO().slice(0, 4) * 12 + +todayISO().slice(5, 7));
+  // meta com prazo: quanto guardar por mês (conta o rendimento aprox.)
+  function guardarPorMes(c, cxsMeta, sal) {
+    if (!c.meta || !c.metaAte) return null;
+    const n = mesesAte(c.metaAte);
+    if (n <= 0) return null;
+    const tem = sal.reduce((a, v) => a + v, 0);
+    const i = tem > 0 ? cxsMeta.reduce((a, x, k) => a + taxaMes(x) * sal[k], 0) / tem : taxaMes(cxsMeta[0]);
+    const falta = c.meta - tem * Math.pow(1 + i, n);
+    if (falta <= 0) return 0;
+    return Math.ceil(i > 0 ? falta * i / (Math.pow(1 + i, n) - 1) : falta / n);
+  }
+  const ateTxt = (ym) => `${mShort(ym)}/${ym.slice(2, 4)}`;
+  // itens do checklist do mês: partes que liberam e conferir com o banco no último dia útil
+  function passosCaixinhas(ym) {
+    const out = [];
+    for (const cx of cfg.caixinhas) for (const p of cx.partes || []) {
+      if (!p.resgate || ymOf(p.resgate) !== ym) continue;
+      out.push({ dia: +p.resgate.slice(8, 10), t: 'Libera parte de ' + cx.nome, done: !!p.visto, valor: p.valor, extra: `${pctTxt(p.taxa)}% do CDI · toque para ver`, fn: () => openParte(cx.id, p) });
+    }
+    if (cfg.caixinhas.length) {
+      const ud = ultDiaUtil(ym), feito = (cfg.conferidos || {})[ym];
+      out.push({ dia: +ud.slice(8, 10), t: 'Conferir caixinhas com o banco', done: !!feito, extra: feito ? 'conferido em ' + dmCurto(feito) : 'dia do salário · toque para conferir', fn: () => openConferir(ym) });
+    }
+    return out;
+  }
+  function openParte(cxId, p) {
+    const cx = cxById(cxId); if (!cx) return;
+    const ja = p.resgate <= todayISO();
+    const body = h('div', { class: 'stack conta', style: 'gap:14px' },
+      h('div', { class: 'ledger' }, linhaE('Valor', p.valor), linhaE('Rende', pctTxt(p.taxa) + '% do CDI'), linhaE('Livre a partir de', fmtD(p.resgate), null, 'res')),
+      h('p', { class: 'sub' }, (ja ? 'Já dá pra resgatar essa parte' : `A partir de ${fmtD(p.resgate)} dá pra resgatar essa parte`) + ` da caixinha ${cx.nome} sem perder a taxa. Se não precisar, pode deixar lá rendendo.`));
+    const marcar = async (v) => {
+      cfg.caixinhas = cfg.caixinhas.map((c) => (c.id !== cx.id ? c : Object.assign({}, c, { partes: (c.partes || []).map((x) => (x === p || (x.valor === p.valor && x.resgate === p.resgate) ? Object.assign({}, x, { visto: v }) : x)) })));
+      sh.close(); render(); await salvarCfg();
+    };
+    if (store.podeGravar()) body.append(h('div', { class: 'row-btns' }, h('button', { class: 'btn' + (p.visto ? ' alt' : ''), type: 'button', style: 'flex:1', onclick: () => marcar(!p.visto) }, p.visto ? 'Desmarcar' : 'Entendi')));
+    const sh = sheet(ja ? 'Parte liberada!' : 'Parte que libera', body);
+  }
+  // no dia em que uma parte libera (ou depois, se o app não foi aberto), aparece sozinho, uma vez por dia, até tocar em Entendi
+  function avisoPartes() {
+    if (!carregou || $('sheet-root').firstChild) return;
+    const hoje = todayISO();
+    if (lsGet('plin-aviso-partes') === hoje) return;
+    for (const cx of cfg.caixinhas) for (const p of cx.partes || []) {
+      if (p.resgate && p.resgate <= hoje && p.resgate >= addDia(hoje, -30) && !p.visto) { lsSet('plin-aviso-partes', hoje); openParte(cx.id, p); return; }
+    }
+  }
+  // no último dia útil: digita o saldo do banco e vê a diferença pro que o Plin estimou
+  function openConferir(ym) {
+    if (bloqueado()) return;
+    ym = ym || ymOf(todayISO());
+    const linhas = cfg.caixinhas.map((cx) => {
+      const est = saldoEst(cx);
+      const inp = moneyInput(null, centStr(est)); inp.setAttribute('aria-label', 'Saldo no banco de ' + cx.nome);
+      const dif = h('span', { class: 'sub' }, '');
+      inp.addEventListener('input', () => {
+        const v = inp.value.trim() ? parseCent(inp.value) : NaN;
+        dif.textContent = isNaN(v) ? '' : v === est ? 'igual ao Plin' : `${v > est ? 'banco tem mais' : 'banco tem menos'}: ${brl(Math.abs(v - est))}`;
+      });
+      return { cx, est, inp, el: h('label', { class: 'cf-row' }, h('span', null, h('b', null, cx.nome), h('br'), h('span', { class: 'sub' }, 'Plin: ' + brl(est) + (cx.banco ? ' · ' + cx.banco : ''))), inp, dif) };
+    });
+    const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, 'Conferir');
+    const body = h('div', { class: 'stack', style: 'gap:10px' },
+      h('p', { class: 'sub' }, 'Digite o saldo que aparece no app do banco (o bruto). Deixe em branco o que estiver igual ao Plin. A conta do rendimento recomeça do valor certo.'),
+      h('div', null, linhas.map((x) => x.el)),
+      h('div', { class: 'row-btns' }, save));
+    const sh = sheet('Conferir com o banco', body);
+    save.addEventListener('click', async () => {
+      const mud = [];
+      for (const x of linhas) {
+        if (!x.inp.value.trim()) continue;
+        const v = parseCent(x.inp.value);
+        if (isNaN(v) || v < 0) { toast('Valor inválido em ' + x.cx.nome + '.'); return; }
+        if (v !== x.est) mud.push({ x, v });
+      }
+      cfg.caixinhas = cfg.caixinhas.map((c) => { const m = mud.find((y) => y.x.cx.id === c.id); return m ? rebaseCx(c, m.v) : c; });
+      cfg.conferidos = Object.assign({}, cfg.conferidos || {}, { [ym]: todayISO() });
+      sh.close(); render(); await salvarCfg();
+      if (!mud.length) { toast('Conferido! Tudo igual ao banco.'); return; }
+      const tot = mud.reduce((a, m) => a + m.v - m.x.est, 0);
+      const res = h('div', { class: 'stack conta', style: 'gap:14px' },
+        h('div', { class: 'ledger' }, mud.map((m) => linhaE(m.x.cx.nome, m.v - m.x.est, m.v > m.x.est ? '+' : null)), linhaE('Diferença total', tot, tot > 0 ? '+' : null, 'res')),
+        h('p', { class: 'sub' }, (tot >= 0 ? 'O banco tinha mais que o Plin. ' : 'O banco tinha menos que o Plin. ') + 'Os saldos já foram trocados pelos do banco. Diferença pequena é normal: o rendimento do Plin é aproximado.'));
+      sheet('Conferido', res);
+    });
+  }
+  // tocar no total das caixinhas: bruto, imposto e líquido
+  function openTotalCx() {
+    const ls = cfg.caixinhas.map((c) => Object.assign({ cx: c }, liquidoCx(c)));
+    const bruto = ls.reduce((a, x) => a + Math.max(0, x.bruto), 0), ir = ls.reduce((a, x) => a + x.ir, 0);
+    const body = h('div', { class: 'stack conta', style: 'gap:14px' },
+      h('div', { class: 'ledger' }, linhaE('Bruto', bruto), linhaE('Imposto de renda (aprox.)', ir, '−'), ls.filter((x) => x.ir).map((x) => subE(`${x.cx.nome} (${pctTxt(x.aliq)}%)`, x.ir)), linhaE('Líquido', bruto - ir, '=', 'res')),
+      h('p', { class: 'sub' }, 'O imposto só incide sobre o rendimento e cai com o tempo: 22,5% até 6 meses, 20% até 1 ano, 17,5% até 2 anos e 15% depois. Pra conta ficar mais certa, preencha "Quanto aplicou" na caixinha (em Mais).'),
+      store.podeGravar() ? h('div', { class: 'row-btns' }, h('button', { class: 'btn alt', type: 'button', style: 'flex:1', onclick: () => { sh.close(); openConferir(); } }, 'Conferir com o banco')) : null);
+    const sh = sheet('Total das caixinhas', body);
+  }
+
+  // 2.20.0: com internet, o Plin busca sozinho o CDI e as cotações (uma vez por dia). Sem internet, fica o último valor.
+  async function buscarTaxas(forcar) {
+    if (!navigator.onLine || !carregou) return false;
+    const hoje = todayISO();
+    if (!forcar && lsGet('plin-auto-em') === hoje) return false;
+    const pega = async (u) => { const c = new AbortController(); const t = setTimeout(() => c.abort(), 8000); try { const r = await fetch(u, { signal: c.signal, cache: 'no-store' }); if (!r.ok) throw new Error(r.status); return await r.json(); } finally { clearTimeout(t); } };
+    const info = {};
+    try {
+      let t = NaN;
+      try { const j = await pega('https://brasilapi.com.br/api/taxas/v1/cdi'); t = Number(j && j.valor); } catch (e) { /* tenta o BC */ }
+      if (!(t > 2 && t < 50)) { const j = await pega('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json'); t = Number(String(j[0].valor).replace(',', '.')); }
+      if (t > 2 && t < 50) {
+        t = Math.round(t * 100) / 100; info.cdi = t;
+        if (Math.abs(t - cdiAtual()) >= 0.01 && store.podeGravar()) {
+          const lista = (cfg.cdi && cfg.cdi.length ? cfg.cdi : [{ desde: '2026-11-01', taxa: CDI_PADRAO }]).filter((x) => x.desde !== hoje);
+          cfg.cdi = [...lista, { desde: hoje, taxa: t, auto: true }].sort((a, b) => a.desde.localeCompare(b.desde));
+          await salvarCfg(); render();
+        }
+      }
+    } catch (e) { /* sem CDI hoje */ }
+    try {
+      const j = await pega('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL');
+      const usd = Math.round(Number(j.USDBRL.bid) * 100), eur = Math.round(Number(j.EURBRL.bid) * 100);
+      if (usd > 100 && eur > 100) { info.usd = usd; info.eur = eur; lsSet('plin-cotacao', JSON.stringify(Object.assign(lerCotacoes(), { usd, eur }))); }
+    } catch (e) { /* sem cotação hoje */ }
+    if (info.cdi || info.usd) { lsSet('plin-auto-em', hoje); lsSet('plin-auto-info', JSON.stringify(Object.assign({ em: hoje }, info))); return true; }
+    return false;
+  }
+  function autoInfo() { try { return JSON.parse(lsGet('plin-auto-info') || 'null'); } catch (e) { return null; } }
+
   function openCdi() {
     if (bloqueado()) return;
     const taxa = h('input', { type: 'text', inputmode: 'decimal', id: 'cdi-taxa', value: n2.format(cdiAtual()) });
     const desde = h('input', { type: 'date', id: 'cdi-desde', value: todayISO() });
     const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, 'Salvar');
     const hist = cdis().filter(() => cfg.cdi && cfg.cdi.length).reverse();
+    const ai = autoInfo();
+    const autoLinha = h('p', { class: 'sub' }, ai ? `Buscado sozinho na internet em ${dmCurto(ai.em)}` + (ai.cdi ? `: CDI ${n2.format(ai.cdi)}%` : '') + (ai.usd ? ` · dólar ${brl(ai.usd)} · euro ${brl(ai.eur)}` : '') + '. ' : 'Com internet, o Plin busca o CDI e as cotações sozinho, uma vez por dia. ',
+      h('button', { class: 'linkish', type: 'button', onclick: async (e) => { e.target.textContent = 'buscando…'; const ok = await buscarTaxas(true); sh.close(); openCdi(); toast(ok ? 'Atualizado.' : 'Não deu pra buscar agora (sem internet?).'); } }, 'Buscar agora'));
     const body = h('div', { class: 'stack', style: 'gap:12px' },
       h('p', { class: 'sub' }, 'O CDI fica sempre uns 0,10 abaixo da Selic, e só muda quando o Copom muda a Selic (8 reuniões por ano). Atualize aqui quando sair notícia de mudança. O rendimento de antes continua com o CDI antigo.'),
       h('div', { class: 'two' }, field('CDI (% ao ano)', taxa), field('Vale desde', desde)),
       hist.length ? h('p', { class: 'sub' }, 'Histórico: ' + hist.map((x) => `${n2.format(x.taxa)}% desde ${x.desde.split('-').reverse().join('/')}`).join(' · ')) : h('p', { class: 'sub' }, `Usando ${n2.format(CDI_PADRAO)}% (Selic de 13,75% em nov/2026).`),
+      autoLinha,
       h('div', { class: 'row-btns' }, save));
     const sh = sheet('CDI', body);
     save.addEventListener('click', async () => {
@@ -1112,6 +1316,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       passos.push({ dia: a.dia || 1, t: 'Guardar em ' + nomeCx(a.cx), done: feito >= a.valor, valor: a.valor, extra: feito > 0 && feito < a.valor ? `guardou ${brl(feito)}` : a.nota, abrir: { tipo: 'guardar', caixinha: a.cx, valor: Math.max(0, a.valor - feito), desc: '' } });
     }
     passos.push(...fixos);
+    passos.push(...passosCaixinhas(mes));
     passos.sort((a, b) => (parseInt(a.dia) || 0) - (parseInt(b.dia) || 0));
     const feitos = passos.filter((x) => x.done).length;
     $('pg-p').hidden = !passos.length;
@@ -1138,9 +1343,10 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   function passoEl(x) {
     const abrir = Object.assign({ novo: true }, x.abrir);
     if (!abrir.data || ymOf(abrir.data) === ymOf(todayISO())) abrir.data = todayISO();
-    return h('button', { class: 'passo' + (x.done ? ' done' : ''), type: 'button', onclick: () => openLanc(abrir) },
-      h('span', { class: 'ck', 'aria-label': x.done ? 'feito' : 'pendente' }, x.done ? '✓' : ''), h('span', { class: 't' }, x.t), h('span', { class: 'v' }, brl(x.valor || x.abrir.valor)),
-      h('small', null, `dia ${x.dia}` + (x.extra ? ' · ' + x.extra : '') + (x.done ? '' : ' · toque para anotar')));
+    const v = x.valor || (x.abrir && x.abrir.valor);
+    return h('button', { class: 'passo' + (x.done ? ' done' : ''), type: 'button', onclick: () => (x.fn ? x.fn() : openLanc(abrir)) },
+      h('span', { class: 'ck', 'aria-label': x.done ? 'feito' : 'pendente' }, x.done ? '✓' : ''), h('span', { class: 't' }, x.t), h('span', { class: 'v' }, v ? brl(v) : ''),
+      h('small', null, `dia ${x.dia}` + (x.extra ? ' · ' + x.extra : '') + (x.done || x.fn ? '' : ' · toque para anotar')));
   }
   function gastoCat(ym, cat) { return (meses[ym] || []).filter((l) => l.tipo === 'gasto' && l.cat === cat).reduce((a, l) => a + l.valor, 0); }
   function renderTetos() {
@@ -1298,8 +1504,19 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     toast('Anotar de novo: confira e toque em Anotar.');
   }
 
+  // caixinhas que somam na meta: a escolha da caixinha, ou (se nunca escolheu) as que têm uma palavra do nome em comum, ex.: "Japão 2028" e "Cofrinho Japão"
+  const palavrasCx = (n) => String(n || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z]+/).filter((w) => w.length >= 4 && !['caixinha', 'cofrinho', 'reserva', 'conta', 'para'].includes(w));
+  function juntoIds(c) {
+    if (Array.isArray(c.somaCom)) return c.somaCom;
+    if (!c.meta) return [];
+    const ws = palavrasCx(c.nome);
+    return cfg.caixinhas.filter((x) => x.id !== c.id && !x.meta && palavrasCx(x.nome).some((w) => ws.includes(w))).map((x) => x.id);
+  }
+  // "só esta": a conta de quanto guardar por mês sem somar as outras (escolha fica neste aparelho)
+  let cxSo = (() => { try { return JSON.parse(lsGet('plin-cx-so') || '[]'); } catch (e) { return []; } })();
+  let cxAbertas = (() => { try { return JSON.parse(lsGet('plin-cx-abertas') || '[]'); } catch (e) { return []; } })();
   function renderCaixinhas() {
-    const cxs = cfg.caixinhas.map((c) => { const rd = rendCx(c); return { ...c, rend: rd, atual: saldoCx(c) + rd }; });
+    const cxs = cfg.caixinhas.map((c) => { const rd = rendCx(c); return { ...c, rend: rd, atual: saldoCx(c) + rd, lq: liquidoCx(c, rd) }; });
     const total = cxs.reduce((a, c) => a + Math.max(0, c.atual), 0);
     $('cx-total').textContent = carregou ? brl(total) : '—';
     const rendTot = cxs.reduce((a, c) => a + c.rend, 0);
@@ -1317,18 +1534,33 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       box.append(h('div', { class: 'grp' },
         h('div', { class: 'grp-h' }, h('span', { class: 'label' }, GRUPOS[k].nome), h('span', { class: 'sub num' }, brl(sum(k)))),
         h('div', { class: 'tiles' }, cs.map((c) => {
-          const junto = (c.somaCom || []).map((id) => cxs.find((x) => x.id === id)).filter(Boolean);
+          const junto = juntoIds(c).map((id) => cxs.find((x) => x.id === id)).filter(Boolean);
           const naMeta = c.atual + junto.reduce((a, x) => a + Math.max(0, x.atual), 0);
-          const dono = cxs.find((x) => x.meta && (x.somaCom || []).includes(c.id));
+          const dono = cxs.find((x) => x.meta && juntoIds(x).includes(c.id));
           const p = c.meta ? Math.min(1, Math.max(0, naMeta / c.meta)) : 1;
+          const presas = (c.partes || []).filter((pt) => pt.resgate && pt.resgate > todayISO()).sort((a, b) => a.resgate.localeCompare(b.resgate));
+          const lv = (c.partes || []).length ? { preso: presas.reduce((a, pt) => a + pt.valor, 0), ate: presas.length ? presas[presas.length - 1].resgate : '', livre: Math.max(0, c.atual - presas.reduce((a, pt) => a + pt.valor, 0)) } : null;
+          const aberta = cxAbertas.includes(c.id);
+          const temExtra = !!(c.meta || dono || presas.length || c.resgate || c.nota);
+          const so = cxSo.includes(c.id) && junto.length > 0, jt = so ? [] : junto;
+          c.porMes = (so ? c.atual : naMeta) < (c.meta || 0) ? guardarPorMes(c, [c, ...jt], [Math.max(0, c.atual), ...jt.map((x) => Math.max(0, x.atual))]) : null;
           return h('button', { class: 'tile', type: 'button', onclick: () => openCx(c.id) },
             h('span', { class: 'gauge' }, h('i', { style: `height:${p * 100}%;background:${GRUPOS[k].cor}` })),
             h('span', { class: 'nm' }, c.nome), h('span', { class: 'sv' }, brl(c.atual)),
-            c.rend ? h('span', { class: 'sub aprox' }, `+${brl(c.rend)} aprox. desde ${dmCurto(inicioRend(c))}`) : null,
-            c.meta ? h('span', { class: 'sub', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, `${Math.floor(naMeta / c.meta * 100)}% de ${brl(c.meta)}` + (junto.length ? ` (${brl(naMeta)} com ${junto.map((x) => x.nome).join(' e ')})` : '') + (naMeta >= c.meta ? ' · meta batida!' : ` · faltam ${brl(c.meta - naMeta)}`)) : null,
-            dono ? h('span', { class: 'sub' }, 'Conta na meta de ' + dono.nome) : null,
-            h('span', { class: 'sub' }, [c.banco, c.rende || (rendeDe(c).tipo !== 'nao' ? rendeTxt(rendeDe(c)) : ''), c.resgate ? 'resgate ' + c.resgate : ''].filter(Boolean).join(' · ')),
-            c.nota ? h('span', { class: 'sub' }, c.nota) : null);
+            c.rend || c.lq.ir ? h('span', { class: 'sub aprox' }, [c.rend ? `+${brl(c.rend)} aprox. desde ${dmCurto(inicioRend(c))}` : '', c.lq.ir ? `líquido ${brl(c.lq.liq)}` : ''].filter(Boolean).join(' · ')) : null,
+            h('span', { class: 'sub' }, [c.banco, c.rende || (rendeDe(c).tipo !== 'nao' ? rendeTxt(rendeDe(c)) : '')].filter(Boolean).join(' · ')),
+            lv ? h('span', { class: 'sub' }, h('b', null, 'Livre agora ' + brl(lv.livre)), lv.preso ? ` · ${brl(lv.preso)} presos até ${dmCurto(lv.ate)}/${lv.ate.slice(2, 4)}` : '') : null,
+            c.meta && !c.metaAte && naMeta < c.meta ? h('span', { class: 'sub meta-l', onclick: (e) => { e.stopPropagation(); openCx(c.id); setTimeout(() => { const el = document.getElementById('cx-meta-ate'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 80); } }, 'Meta de ', h('b', null, brl(c.meta)), ' · escolha até quando pra ver quanto guardar por mês') : null,
+            c.porMes != null ? h('span', { class: 'sub meta-l', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, c.porMes ? ['Guarde ', h('b', null, brl(c.porMes) + '/mês'), ` até ${ateTxt(c.metaAte)}`] : `Chega até ${ateTxt(c.metaAte)} só rendendo`,
+              junto.length ? h('span', { class: 'so-t', role: 'button', onclick: (e) => { e.stopPropagation(); cxSo = so ? cxSo.filter((x) => x !== c.id) : [...cxSo, c.id]; lsSet('plin-cx-so', JSON.stringify(cxSo)); renderCaixinhas(); } }, so ? 'só esta' : 'com ' + junto.map((x) => x.nome).join(' e ')) : null) : null,
+            temExtra ? h('span', { class: 'mais-t', role: 'button', 'aria-expanded': String(aberta), onclick: (e) => { e.stopPropagation(); cxAbertas = aberta ? cxAbertas.filter((x) => x !== c.id) : [...cxAbertas, c.id]; lsSet('plin-cx-abertas', JSON.stringify(cxAbertas)); renderCaixinhas(); } }, aberta ? 'menos ▴' : 'mais ▾') : null,
+            aberta ? h('span', { class: 'extra' },
+              c.meta ? h('span', { class: 'sub', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, `Meta: ${Math.floor(naMeta / c.meta * 100)}% de ${brl(c.meta)}` + (junto.length ? ` (${brl(naMeta)} com ${junto.map((x) => x.nome).join(' e ')})` : '') + (naMeta >= c.meta ? ' · meta batida!' : ` · faltam ${brl(c.meta - naMeta)}`)) : null,
+              dono ? h('span', { class: 'sub' }, 'Conta na meta de ' + dono.nome) : null,
+              presas.length ? h('span', { class: 'sub' }, 'Partes que liberam:') : null,
+              presas.map((pt) => h('span', { class: 'pt' }, h('span', null, fmtD(pt.resgate).replace(/(\d{2}\/\d{2}\/)\d{2}(\d{2})/, '$1$2')), h('span', null, pctTxt(pt.taxa) + '% do CDI'), h('b', null, brl(pt.valor)))),
+              c.resgate ? h('span', { class: 'sub' }, 'Resgate: ' + c.resgate) : null,
+              c.nota ? h('span', { class: 'sub' }, c.nota) : null) : null);
         }))));
     }
   }
@@ -1791,7 +2023,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   const taxaMes = (cx) => { const r = rendeDe(cx); const aa = r.tipo === 'cdi' ? cdiAtual() * r.taxa / 100 : r.tipo === 'pre' ? r.taxa : 0; return aa > 0 ? Math.pow(1 + aa / 100, 1 / 12) - 1 : 0; };
   // 5. caixinha com meta: em que mês a meta chega, seguindo o plano
   function openMetaCx(c) {
-    const ids = [c.id, ...(c.somaCom || [])];
+    const ids = [c.id, ...(cxSo.includes(c.id) ? [] : juntoIds(c))];
     const cxs = ids.map(cxById).filter(Boolean);
     const sal = cxs.map((x) => Math.max(0, saldoCx(x) + rendCx(x)));
     const tem = sal.reduce((a, v) => a + v, 0);
@@ -1824,7 +2056,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       linhaE('Falta', c.meta - tem, '=', 'res'),
       linhaE(`Plano guarda em ${mShort(prox)}`, porMes),
       rendM ? linhaE('Rende por mês (aprox.)', rendM) : null,
-      linhaE('Chega lá em', com ? mLong(com) : 'não chega', null, 'res')));
+      linhaE('Chega lá em', com ? mLong(com) : 'não chega', null, 'res'),
+      c.metaAte ? linhaE(`Pra chegar até ${ateTxt(c.metaAte)}`, mesesAte(c.metaAte) > 0 ? brl(guardarPorMes(c, cxs, sal)) + '/mês' : 'prazo passou', null, 'res') : null));
     body.append(h('p', { class: 'sub' }, !com ? 'O plano não guarda nada nessa caixinha, então no ritmo atual a meta não chega. Dá pra mudar isso no Plano.' :
       `Seguindo o plano${rendM ? ' e com o rendimento aproximado' : ''}, a meta chega em ${mLong(com).toLowerCase()}.` + (rendM && sem && sem !== com ? ` Só com os aportes, sem rendimento, seria em ${mLong(sem).toLowerCase()}.` : '')));
     sheet(c.nome, body);
@@ -1891,6 +2124,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.20.0', 'Caixinhas: líquido sem imposto de renda (tocando no total aparece a conta), cada caixinha mostra quanto está livre agora e tem um "mais" com o resto, partes que liberam avisam sozinhas no dia e no checklist do mês, meta com prazo mostra quanto guardar por mês (juntando ou não com a outra caixinha do mesmo objetivo), e no último dia útil o checklist pede pra conferir os saldos com o banco. Com internet, o CDI e as cotações do dólar e do euro se atualizam sozinhos.'],
     ['2.19.1', 'No calendário do mês, tocar num dia mostra os gastos daquele dia logo embaixo. No extrato, tocar num dia sem gastos avisa "Sem gastos nesse dia" (e não seleciona mais o texto).'],
     ['2.19.0', 'Tocando no Gastou: calendário do mês com cada dia colorido pelo gasto, total de cada semana e comparação com o mesmo mês do ano passado. Filtro nos Gráficos pra esconder categorias (Viagem, por exemplo). E um segredo: toque no valor de um gasto.'],
     ['2.18.1', 'Categorias em grade, com o ícone grande e o nome embaixo, no Anotar e na Config (mais compacta lá, com as arquivadas recolhidas). Ícones maiores no resto do app.'],
@@ -2274,7 +2508,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const grupo = h('select', { id: 'cx-grupo' }, Object.entries(GRUPOS).map(([k, g]) => h('option', { value: k }, g.nome))); grupo.value = cx ? cx.grupo : 'investimentos';
     const saldo = moneyInput(atual); saldo.id = 'cx-saldo';
     const meta = moneyInput(cx && cx.meta, 'Opcional'); meta.id = 'cx-meta';
-    let soma = cx ? [...(cx.somaCom || [])] : [];
+    let soma = cx ? [...juntoIds(cx)] : [];
     const somaBox = h('div', { class: 'chips' });
     const paintSoma = () => somaBox.replaceChildren(...cfg.caixinhas.filter((c) => !cx || c.id !== cx.id).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(soma.includes(c.id)), onclick: () => { soma = soma.includes(c.id) ? soma.filter((x) => x !== c.id) : [...soma, c.id]; paintSoma(); } }, c.nome)));
     paintSoma();
@@ -2285,6 +2519,15 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const pintaR = () => { rTaxaF.hidden = rTipo.value === 'nao'; }; rTipo.addEventListener('change', pintaR); pintaR();
     const resgate = h('input', { type: 'text', id: 'cx-resgate', value: cx ? cx.resgate || '' : '', placeholder: 'Ex.: diária, no vencimento' });
     const nota = h('input', { type: 'text', id: 'cx-nota', value: cx ? cx.nota || '' : '', placeholder: 'Para que serve' });
+    const metaAte = h('input', { type: 'month', id: 'cx-meta-ate', value: cx && cx.metaAte ? cx.metaAte : '' });
+    const aplic = moneyInput(cx && cx.aplicado, 'Opcional'); aplic.id = 'cx-aplic';
+    const aplicEm = h('input', { type: 'date', id: 'cx-aplic-em', value: cx && cx.aplicadoEm ? cx.aplicadoEm : '' });
+    const lq = cx ? liquidoCx(cx) : null;
+    const partesIn = h('textarea', { id: 'cx-partes', rows: '4', placeholder: '302,23 103,5% 26/12/2026\n928,10 100% imediato' });
+    partesIn.value = cx ? partesTxt(cx.partes) : '';
+    const partesInfo = h('p', { class: 'sub' });
+    const pintaPartes = () => { const r = lerPartes(partesIn.value); const tot = r.partes.reduce((a, p) => a + p.valor, 0); partesInfo.textContent = r.erros.length ? `Não entendi: ${r.erros[0]}` : r.partes.length ? `${r.partes.length} ${r.partes.length === 1 ? 'parte' : 'partes'}, somando ${brl(tot)}` + (cx ? ` (saldo de hoje ${brl(atual)})` : '') + '.' : ''; };
+    partesIn.addEventListener('input', pintaPartes); pintaPartes();
     const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, cx ? 'Salvar' : 'Criar caixinha');
     const usada = cx && all().some((l) => l.caixinha === cx.id || l.origem === cx.id || l.para === cx.id);
     // o que mexeu no saldo desde o último saldo informado (gastos que saíram dela descontam sozinhos)
@@ -2301,9 +2544,17 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       cx ? h('p', { class: 'sub', style: 'margin-top:-6px' }, (rendAgora ? `Já conta +${brl(rendAgora)} de rendimento aprox. desde ${dmCurto(inicioRend(cx))}. ` : '') + 'Gastos, guardar, resgatar e transferências já mudam o saldo sozinhos. Para corrigir, troque pelo saldo que aparece no banco: a conta recomeça dali.') : null,
       movBox,
       h('div', { class: 'two' }, field('Rendimento automático', rTipo), rTaxaF),
-      h('div', { class: 'two' }, field('Meta', meta), field('Rende (texto)', rende)),
-      h('div', { class: 'field' }, h('span', null, 'Somar na meta o saldo de (opcional)'), somaBox),
-      field('Resgate', resgate), field('Para que serve', nota),
+      h('div', { class: 'two' }, field('Meta', meta), field('Até quando (opcional)', metaAte)),
+      h('div', { class: 'field' }, h('span', null, 'Somar na meta o saldo de (opcional)'), somaBox, cx && !Array.isArray(cx.somaCom) && soma.length ? h('p', { class: 'sub' }, 'Marquei as que parecem ter o mesmo objetivo. Desmarque se não for.') : null),
+      h('div', { class: 'two' }, field('Resgate', resgate), field('Rende (texto)', rende)), field('Para que serve', nota),
+      Object.assign(h('details', { class: 'mais' }, h('summary', null, 'Mais: imposto e partes'),
+        h('div', { class: 'stack' },
+          h('p', { class: 'sub' }, 'Pra calcular o líquido (sem imposto de renda): quanto você aplicou no total e quando foi a primeira aplicação. Sem isso, o Plin só tira o imposto do rendimento que ele mesmo calculou.'),
+          h('div', { class: 'two' }, field('Quanto aplicou', aplic), field('Aplicou em', aplicEm)),
+          lq && lq.ir ? h('p', { class: 'sub' }, `Hoje: bruto ${brl(lq.bruto)}, imposto ${brl(lq.ir)} (${pctTxt(lq.aliq)}%), líquido ${brl(lq.liq)} aprox.`) : null,
+          h('p', { class: 'sub' }, 'Partes (uma por linha: valor, taxa e data em que libera sem perder a taxa). O Plin avisa no checklist do mês quando uma parte libera.'),
+          h('label', { class: 'field' }, h('span', null, 'Partes'), partesIn),
+          partesInfo)), { open: !!(cx && ((cx.partes || []).length || cx.aplicado)) }),
       h('div', { class: 'row-btns' }, save, cx && !usada ? dangerBtn('Excluir', async () => { cfg.caixinhas = cfg.caixinhas.filter((c) => c.id !== cx.id); sh.close(); render(); await salvarCfg(); toast('Caixinha excluída.'); }) : null),
       cx && usada ? h('p', { class: 'sub' }, 'Tem lançamentos ligados a ela, então não dá para excluir.') : null);
     const sh = sheet(cx ? cx.nome : 'Nova caixinha', body);
@@ -2313,12 +2564,19 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       if (isNaN(s)) { toast('Saldo inválido.'); return; }
       const m = meta.value.trim() ? parseCent(meta.value) : null;
       const rec = { id: cx ? cx.id : uid(), nome: nome.value.trim(), banco: banco.value.trim(), grupo: grupo.value, meta: m && m > 0 ? m : null, rende: rende.value.trim(), resgate: resgate.value.trim(), nota: nota.value.trim(), saldoBase: cx ? cx.saldoBase : s, baseEm: cx ? cx.baseEm : Date.now() };
-      if (rec.meta && soma.length) rec.somaCom = soma.filter((id) => cxById(id));
+      if (rec.meta) rec.somaCom = soma.filter((id) => cxById(id));
+      if (rec.meta && metaAte.value) rec.metaAte = metaAte.value;
+      const ap = aplic.value.trim() ? parseCent(aplic.value) : 0;
+      if (isNaN(ap) || ap < 0) { toast('"Quanto aplicou" inválido.'); return; }
+      if (ap > 0) { rec.aplicado = ap; if (aplicEm.value) rec.aplicadoEm = aplicEm.value; }
+      const pr = lerPartes(partesIn.value, cx && cx.partes);
+      if (pr.erros.length) { toast('Não entendi a parte: ' + pr.erros[0]); return; }
+      if (pr.partes.length) rec.partes = pr.partes;
       const tx = Number(String(rTaxa.value).replace(/\s|%/g, '').replace(',', '.'));
       if (rTipo.value !== 'nao' && !(tx > 0 && tx < 1000)) { toast('Taxa inválida.'); return; }
       rec.rendeAuto = { tipo: rTipo.value, taxa: rTipo.value === 'nao' ? 0 : Math.round(tx * 100) / 100 };
       rec.rendeDesde = cx && cx.rendeDesde ? cx.rendeDesde : todayISO();
-      if (cx && s !== atual) { rec.saldoBase = s; rec.baseEm = Date.now(); rec.rendeDesde = todayISO(); }
+      if (cx && s !== atual) { const rb = rebaseCx(Object.assign({}, cx, { aplicado: rec.aplicado }), s); rec.saldoBase = s; rec.baseEm = rb.baseEm; rec.rendeDesde = rb.rendeDesde; if (rec.aplicado && rec.aplicado === cx.aplicado) rec.aplicado = rb.aplicado; }
       cfg.caixinhas = cx ? cfg.caixinhas.map((c) => (c.id === cx.id ? rec : c)) : [...cfg.caixinhas, rec];
       sh.close(); render(); await salvarCfg();
       toast(cx && s !== atual ? (rendAgora ? `Saldo corrigido. O estimado estava ${brl(Math.abs(s - atual))} ${s > atual ? 'abaixo' : 'acima'} do banco.` : `Saldo atualizado (${s > atual ? '+' : '−'} ${brl(Math.abs(s - atual))}).`) : 'Salvo.');
@@ -2674,6 +2932,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   showTab();
   $('anotar').addEventListener('click', () => openLanc());
   $('cx-new').addEventListener('click', () => openCx());
+  $('cx-total').addEventListener('click', () => { if (carregou && cfg.caixinhas.length) openTotalCx(); });
   $('cx-transf').addEventListener('click', () => abrirTransf());
   $('cx-rend').addEventListener('click', () => openCdi());
   $('pj-new').addEventListener('click', () => openPlanejado());
@@ -2740,11 +2999,13 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     if (mes === ymOf(diaVisto) && ymOf(hoje) !== mes) mes = ymOf(hoje); // estava no mês atual: segue pro mês novo
     diaVisto = hoje; if (carregou) render();
   };
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') conferirDia(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { conferirDia(); buscarTaxas(); avisoPartes(); } });
   window.addEventListener('focus', conferirDia);
   setInterval(() => { if (document.visibilityState === 'visible') conferirDia(); }, 60000);
   render();
   store.init().then(() => {
+    setTimeout(() => buscarTaxas(), 1500);
+    setTimeout(avisoPartes, 800);
     // veio pelo atalho do ícone (segurar o ícone do Plin > Anotar gasto)
     if (new URLSearchParams(location.search).has('anotar') && carregou) { history.replaceState(null, '', location.pathname + '?app=plin'); openLanc(); }
   });
