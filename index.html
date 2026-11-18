@@ -112,12 +112,9 @@ button { cursor: pointer; }
 .tile { align-content: start; }
 .tile .meta-l b { color: var(--ink); font-weight: 600; }
 .tile .so-t { display: inline-block; margin-left: 6px; padding: 1px 7px; border: 1px solid var(--line); border-radius: 999px; font-size: .72rem; color: var(--muted); cursor: pointer; }
-.tile.ord { grid-template-columns: 1fr auto; align-items: center; gap: 2px 10px; }
-.tile.ord .nm { grid-column: 1; } .tile.ord .sub { grid-column: 1; }
-.tile.ord .ord-b { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 6px; }
-.tile.ord .ord-b button { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--field); color: var(--ink); font-size: .9rem; }
-.tile.ord .ord-b button:disabled { opacity: .3; }
-.ord-ok { border: 0; background: var(--tang); color: var(--tang-ink); border-radius: 999px; padding: 5px 14px; font-weight: 600; font-size: .85rem; }
+.tiles .tile { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.tile.arrastando { position: relative; z-index: 5; box-shadow: 0 12px 28px rgba(36, 26, 74, .25); transition: box-shadow .15s; opacity: .95; }
+.tile.alvo { outline: 2px dashed var(--tang); outline-offset: 2px; }
 .tile .mais-t { justify-self: start; font-size: .76rem; font-weight: 600; color: var(--tang); padding: 4px 0 0; cursor: pointer; }
 .tile .extra { display: grid; gap: 4px; padding-top: 6px; margin-top: 2px; border-top: 1px dashed var(--line); }
 .tile .pt { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; font-size: .76rem; color: var(--muted); }
@@ -1139,7 +1136,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     if (mes < ini) ini = mes;
     let fim = addMonths(now, 2); if (mes > fim) fim = mes;
     const ms = []; for (let m = ini; m <= fim; m = addMonths(m, 1)) ms.push(m);
-    box.replaceChildren(...ms.map((m) => h('button', { type: 'button', 'aria-pressed': String(m === mes), 'aria-label': mLong(m), onclick: () => { mes = m; render(); } }, h('b', null, cap(mShort(m))), h('small', null, m.slice(0, 4)))));
+    // segurar um mês abre o calendário dele (o mesmo do toque no Gastou)
+    box.replaceChildren(...ms.map((m) => { const b = h('button', { type: 'button', 'aria-pressed': String(m === mes), 'aria-label': mLong(m), onclick: () => { if (segurou) { segurou = false; return; } mes = m; render(); } }, h('b', null, cap(mShort(m))), h('small', null, m.slice(0, 4))); segurar(b, () => { mes = m; render(); openDetalhe('gastou'); }); return b; }));
     const sel = box.querySelector('[aria-pressed="true"]');
     if (sel) box.scrollLeft = sel.offsetLeft - box.clientWidth / 2 + sel.clientWidth / 2;
   }
@@ -1520,14 +1518,39 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   }
   // "só esta": a conta de quanto guardar por mês sem somar as outras (escolha fica neste aparelho)
   let cxSo = (() => { try { return JSON.parse(lsGet('plin-cx-so') || '[]'); } catch (e) { return []; } })();
-  // segurar uma caixinha: modo de mudar a ordem dentro do grupo (setas), salvo em cfg.ordemCx
-  let ordenando = null;
-  async function moverCx(cs, ix, d) {
-    const j = ix + d; if (j < 0 || j >= cs.length) return;
-    const ids = cs.map((c) => c.id); [ids[ix], ids[j]] = [ids[j], ids[ix]];
+  // segurar e arrastar uma caixinha muda a ordem dentro do grupo (salva em cfg.ordemCx)
+  async function moverCx(cs, de, para) {
+    if (para === de || para < 0) return;
+    const ids = cs.map((c) => c.id); const [x] = ids.splice(de, 1); ids.splice(para, 0, x);
     const resto = (cfg.ordemCx || cfg.caixinhas.map((c) => c.id)).filter((id) => !ids.includes(id));
     cfg.ordemCx = [...resto, ...ids];
     renderCaixinhas(); await salvarCfg();
+  }
+  function arrastavel(el, onDrop) {
+    let t = null, drag = false, x0 = 0, y0 = 0, alvo = null;
+    const irmaos = () => [...el.parentElement.children].filter((c) => c !== el);
+    const ini = (x, y) => { x0 = x; y0 = y; clearTimeout(t); t = setTimeout(() => { t = null; drag = true; segurou = true; try { navigator.vibrate && navigator.vibrate(15); } catch (_) {} el.classList.add('arrastando'); }, 450); };
+    const mov = (x, y, e) => {
+      if (t && Math.hypot(x - x0, y - y0) > 10) { clearTimeout(t); t = null; }
+      if (!drag) return;
+      if (e.cancelable) e.preventDefault();
+      el.style.transform = `translate(${x - x0}px, ${y - y0}px)`;
+      alvo = null;
+      for (const c of irmaos()) { const r = c.getBoundingClientRect(); const dentro = x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; c.classList.toggle('alvo', dentro); if (dentro) alvo = c; }
+    };
+    const fim = () => {
+      clearTimeout(t); t = null;
+      if (!drag) return;
+      drag = false; el.style.transform = ''; el.classList.remove('arrastando');
+      for (const c of irmaos()) c.classList.remove('alvo');
+      if (alvo) { const todos = [...el.parentElement.children]; onDrop(todos.indexOf(alvo)); }
+      alvo = null;
+    };
+    el.addEventListener('touchstart', (e) => { if (e.touches.length === 1) ini(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+    el.addEventListener('touchmove', (e) => mov(e.touches[0].clientX, e.touches[0].clientY, e), { passive: false });
+    el.addEventListener('touchend', fim); el.addEventListener('touchcancel', fim);
+    el.addEventListener('mousedown', (e) => { if (e.button !== 0) return; ini(e.clientX, e.clientY); const mm = (ev) => mov(ev.clientX, ev.clientY, ev); const mu = () => { window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); fim(); }; window.addEventListener('mousemove', mm); window.addEventListener('mouseup', mu); });
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
   }
   let cxAbertas = (() => { try { return JSON.parse(lsGet('plin-cx-abertas') || '[]'); } catch (e) { return []; } })();
   function renderCaixinhas() {
@@ -1547,13 +1570,9 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     for (const k of ks) {
       const ord = cfg.ordemCx || [], pos = (c) => { const i = ord.indexOf(c.id); return i < 0 ? 1e6 : i; };
       const cs = cxs.filter((c) => c.grupo === k).sort((a, b) => pos(a) - pos(b) || b.atual - a.atual);
-      const ordenar = ordenando === k;
       box.append(h('div', { class: 'grp' },
-        h('div', { class: 'grp-h' }, h('span', { class: 'label' }, GRUPOS[k].nome), ordenar ? h('button', { class: 'ord-ok', type: 'button', onclick: () => { ordenando = null; renderCaixinhas(); } }, 'Pronto') : h('span', { class: 'sub num' }, brl(sum(k)))),
-        h('div', { class: 'tiles' + (ordenar ? ' ordenando' : '') }, cs.map((c, ix) => {
-          if (ordenar) return h('div', { class: 'tile ord' }, h('span', { class: 'gauge' }, h('i', { style: `height:100%;background:${GRUPOS[k].cor}` })),
-            h('span', { class: 'nm' }, c.nome), h('span', { class: 'sub' }, brl(c.atual)),
-            h('span', { class: 'ord-b' }, h('button', { type: 'button', 'aria-label': 'Subir ' + c.nome, disabled: ix === 0 ? true : null, onclick: () => moverCx(cs, ix, -1) }, '▲'), h('button', { type: 'button', 'aria-label': 'Descer ' + c.nome, disabled: ix === cs.length - 1 ? true : null, onclick: () => moverCx(cs, ix, 1) }, '▼')));
+        h('div', { class: 'grp-h' }, h('span', { class: 'label' }, GRUPOS[k].nome), h('span', { class: 'sub num' }, brl(sum(k)))),
+        h('div', { class: 'tiles' }, cs.map((c, ix) => {
           const junto = juntoIds(c).map((id) => cxs.find((x) => x.id === id)).filter(Boolean);
           const naMeta = c.atual + junto.reduce((a, x) => a + Math.max(0, x.atual), 0);
           const dono = cxs.find((x) => x.meta && juntoIds(x).includes(c.id));
@@ -1581,7 +1600,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
               presas.map((pt) => h('span', { class: 'pt' }, h('span', null, fmtD(pt.resgate).replace(/(\d{2}\/\d{2}\/)\d{2}(\d{2})/, '$1$2')), h('span', null, pctTxt(pt.taxa) + '% do CDI'), h('b', null, brl(pt.valor)))),
               c.resgate ? h('span', { class: 'sub' }, 'Resgate: ' + c.resgate) : null,
               c.nota ? h('span', { class: 'sub' }, c.nota) : null) : null);
-          if (cs.length > 1 && store.podeGravar()) segurar(tl, () => { ordenando = k; renderCaixinhas(); toast('Use as setas pra mudar a ordem. Toque em Pronto quando terminar.'); });
+          if (cs.length > 1 && store.podeGravar()) arrastavel(tl, (para) => moverCx(cs, ix, para));
           return tl;
         }))));
     }
@@ -2146,7 +2165,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
-    ['2.21.0', 'Segurando uma caixinha dá pra mudar a ordem das caixinhas dentro do grupo (setas pra subir e descer).'],
+    ['2.21.0', 'Segurando e arrastando uma caixinha dá pra mudar a ordem dentro do grupo. Segurando um mês lá em cima abre o calendário de gastos dele.'],
     ['2.20.0', 'Caixinhas: líquido sem imposto de renda (tocando no total aparece a conta), cada caixinha mostra quanto está livre agora e tem um "mais" com o resto, partes que liberam avisam sozinhas no dia e no checklist do mês, meta com prazo mostra quanto guardar por mês (juntando ou não com a outra caixinha do mesmo objetivo), e no último dia útil o checklist pede pra conferir os saldos com o banco. Com internet, o CDI e as cotações do dólar e do euro se atualizam sozinhos.'],
     ['2.19.1', 'No calendário do mês, tocar num dia mostra os gastos daquele dia logo embaixo. No extrato, tocar num dia sem gastos avisa "Sem gastos nesse dia" (e não seleciona mais o texto).'],
     ['2.19.0', 'Tocando no Gastou: calendário do mês com cada dia colorido pelo gasto, total de cada semana e comparação com o mesmo mês do ano passado. Filtro nos Gráficos pra esconder categorias (Viagem, por exemplo). E um segredo: toque no valor de um gasto.'],
