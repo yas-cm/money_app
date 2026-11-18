@@ -110,7 +110,8 @@ button { cursor: pointer; }
 .tile .sv { font-family: var(--display); font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
 .tile .sub { font-size: .76rem; }
 .tile { align-content: start; }
-.tile .meta-dest { justify-self: start; margin-top: 2px; background: var(--tang-soft); color: var(--ink); border-radius: 8px; padding: 5px 9px; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.tile .meta-l b { color: var(--ink); font-weight: 600; }
+.tile .so-t { display: inline-block; margin-left: 6px; padding: 1px 7px; border: 1px solid var(--line); border-radius: 999px; font-size: .72rem; color: var(--muted); cursor: pointer; }
 .tile .mais-t { justify-self: start; font-size: .76rem; font-weight: 600; color: var(--tang); padding: 4px 0 0; cursor: pointer; }
 .tile .extra { display: grid; gap: 4px; padding-top: 6px; margin-top: 2px; border-top: 1px dashed var(--line); }
 .tile .pt { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; font-size: .76rem; color: var(--muted); }
@@ -1503,6 +1504,16 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     toast('Anotar de novo: confira e toque em Anotar.');
   }
 
+  // caixinhas que somam na meta: a escolha da caixinha, ou (se nunca escolheu) as que têm uma palavra do nome em comum, ex.: "Japão 2028" e "Cofrinho Japão"
+  const palavrasCx = (n) => String(n || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z]+/).filter((w) => w.length >= 4 && !['caixinha', 'cofrinho', 'reserva', 'conta', 'para'].includes(w));
+  function juntoIds(c) {
+    if (Array.isArray(c.somaCom)) return c.somaCom;
+    if (!c.meta) return [];
+    const ws = palavrasCx(c.nome);
+    return cfg.caixinhas.filter((x) => x.id !== c.id && !x.meta && palavrasCx(x.nome).some((w) => ws.includes(w))).map((x) => x.id);
+  }
+  // "só esta": a conta de quanto guardar por mês sem somar as outras (escolha fica neste aparelho)
+  let cxSo = (() => { try { return JSON.parse(lsGet('plin-cx-so') || '[]'); } catch (e) { return []; } })();
   let cxAbertas = (() => { try { return JSON.parse(lsGet('plin-cx-abertas') || '[]'); } catch (e) { return []; } })();
   function renderCaixinhas() {
     const cxs = cfg.caixinhas.map((c) => { const rd = rendCx(c); return { ...c, rend: rd, atual: saldoCx(c) + rd, lq: liquidoCx(c, rd) }; });
@@ -1523,22 +1534,24 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       box.append(h('div', { class: 'grp' },
         h('div', { class: 'grp-h' }, h('span', { class: 'label' }, GRUPOS[k].nome), h('span', { class: 'sub num' }, brl(sum(k)))),
         h('div', { class: 'tiles' }, cs.map((c) => {
-          const junto = (c.somaCom || []).map((id) => cxs.find((x) => x.id === id)).filter(Boolean);
+          const junto = juntoIds(c).map((id) => cxs.find((x) => x.id === id)).filter(Boolean);
           const naMeta = c.atual + junto.reduce((a, x) => a + Math.max(0, x.atual), 0);
-          const dono = cxs.find((x) => x.meta && (x.somaCom || []).includes(c.id));
+          const dono = cxs.find((x) => x.meta && juntoIds(x).includes(c.id));
           const p = c.meta ? Math.min(1, Math.max(0, naMeta / c.meta)) : 1;
           const presas = (c.partes || []).filter((pt) => pt.resgate && pt.resgate > todayISO()).sort((a, b) => a.resgate.localeCompare(b.resgate));
           const lv = (c.partes || []).length ? { preso: presas.reduce((a, pt) => a + pt.valor, 0), ate: presas.length ? presas[presas.length - 1].resgate : '', livre: Math.max(0, c.atual - presas.reduce((a, pt) => a + pt.valor, 0)) } : null;
           const aberta = cxAbertas.includes(c.id);
           const temExtra = !!(c.meta || dono || presas.length || c.resgate || c.nota);
-          c.porMes = naMeta < (c.meta || 0) ? guardarPorMes(c, [c, ...junto], [Math.max(0, c.atual), ...junto.map((x) => Math.max(0, x.atual))]) : null;
+          const so = cxSo.includes(c.id) && junto.length > 0, jt = so ? [] : junto;
+          c.porMes = (so ? c.atual : naMeta) < (c.meta || 0) ? guardarPorMes(c, [c, ...jt], [Math.max(0, c.atual), ...jt.map((x) => Math.max(0, x.atual))]) : null;
           return h('button', { class: 'tile', type: 'button', onclick: () => openCx(c.id) },
             h('span', { class: 'gauge' }, h('i', { style: `height:${p * 100}%;background:${GRUPOS[k].cor}` })),
             h('span', { class: 'nm' }, c.nome), h('span', { class: 'sv' }, brl(c.atual)),
             c.rend || c.lq.ir ? h('span', { class: 'sub aprox' }, [c.rend ? `+${brl(c.rend)} aprox. desde ${dmCurto(inicioRend(c))}` : '', c.lq.ir ? `líquido ${brl(c.lq.liq)}` : ''].filter(Boolean).join(' · ')) : null,
             h('span', { class: 'sub' }, [c.banco, c.rende || (rendeDe(c).tipo !== 'nao' ? rendeTxt(rendeDe(c)) : '')].filter(Boolean).join(' · ')),
             lv ? h('span', { class: 'sub' }, h('b', null, 'Livre agora ' + brl(lv.livre)), lv.preso ? ` · ${brl(lv.preso)} presos até ${dmCurto(lv.ate)}/${lv.ate.slice(2, 4)}` : '') : null,
-            c.porMes != null ? h('span', { class: 'meta-dest', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, (c.porMes ? `Guarde ${brl(c.porMes)}/mês até ${ateTxt(c.metaAte)}` : `Chega até ${ateTxt(c.metaAte)} só rendendo`) + (junto.length ? ` somando com ${junto.map((x) => x.nome).join(' e ')}` : '')) : null,
+            c.porMes != null ? h('span', { class: 'sub meta-l', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, c.porMes ? ['Guarde ', h('b', null, brl(c.porMes) + '/mês'), ` até ${ateTxt(c.metaAte)}`] : `Chega até ${ateTxt(c.metaAte)} só rendendo`,
+              junto.length ? h('span', { class: 'so-t', role: 'button', onclick: (e) => { e.stopPropagation(); cxSo = so ? cxSo.filter((x) => x !== c.id) : [...cxSo, c.id]; lsSet('plin-cx-so', JSON.stringify(cxSo)); renderCaixinhas(); } }, so ? 'só esta' : 'com ' + junto.map((x) => x.nome).join(' e ')) : null) : null,
             temExtra ? h('span', { class: 'mais-t', role: 'button', 'aria-expanded': String(aberta), onclick: (e) => { e.stopPropagation(); cxAbertas = aberta ? cxAbertas.filter((x) => x !== c.id) : [...cxAbertas, c.id]; lsSet('plin-cx-abertas', JSON.stringify(cxAbertas)); renderCaixinhas(); } }, aberta ? 'menos ▴' : 'mais ▾') : null,
             aberta ? h('span', { class: 'extra' },
               c.meta ? h('span', { class: 'sub', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, `Meta: ${Math.floor(naMeta / c.meta * 100)}% de ${brl(c.meta)}` + (junto.length ? ` (${brl(naMeta)} com ${junto.map((x) => x.nome).join(' e ')})` : '') + (naMeta >= c.meta ? ' · meta batida!' : ` · faltam ${brl(c.meta - naMeta)}`)) : null,
@@ -2009,7 +2022,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   const taxaMes = (cx) => { const r = rendeDe(cx); const aa = r.tipo === 'cdi' ? cdiAtual() * r.taxa / 100 : r.tipo === 'pre' ? r.taxa : 0; return aa > 0 ? Math.pow(1 + aa / 100, 1 / 12) - 1 : 0; };
   // 5. caixinha com meta: em que mês a meta chega, seguindo o plano
   function openMetaCx(c) {
-    const ids = [c.id, ...(c.somaCom || [])];
+    const ids = [c.id, ...(cxSo.includes(c.id) ? [] : juntoIds(c))];
     const cxs = ids.map(cxById).filter(Boolean);
     const sal = cxs.map((x) => Math.max(0, saldoCx(x) + rendCx(x)));
     const tem = sal.reduce((a, v) => a + v, 0);
@@ -2494,7 +2507,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const grupo = h('select', { id: 'cx-grupo' }, Object.entries(GRUPOS).map(([k, g]) => h('option', { value: k }, g.nome))); grupo.value = cx ? cx.grupo : 'investimentos';
     const saldo = moneyInput(atual); saldo.id = 'cx-saldo';
     const meta = moneyInput(cx && cx.meta, 'Opcional'); meta.id = 'cx-meta';
-    let soma = cx ? [...(cx.somaCom || [])] : [];
+    let soma = cx ? [...juntoIds(cx)] : [];
     const somaBox = h('div', { class: 'chips' });
     const paintSoma = () => somaBox.replaceChildren(...cfg.caixinhas.filter((c) => !cx || c.id !== cx.id).map((c) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(soma.includes(c.id)), onclick: () => { soma = soma.includes(c.id) ? soma.filter((x) => x !== c.id) : [...soma, c.id]; paintSoma(); } }, c.nome)));
     paintSoma();
@@ -2531,7 +2544,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       movBox,
       h('div', { class: 'two' }, field('Rendimento automático', rTipo), rTaxaF),
       h('div', { class: 'two' }, field('Meta', meta), field('Até quando (opcional)', metaAte)),
-      h('div', { class: 'field' }, h('span', null, 'Somar na meta o saldo de (opcional)'), somaBox),
+      h('div', { class: 'field' }, h('span', null, 'Somar na meta o saldo de (opcional)'), somaBox, cx && !Array.isArray(cx.somaCom) && soma.length ? h('p', { class: 'sub' }, 'Marquei as que parecem ter o mesmo objetivo. Desmarque se não for.') : null),
       h('div', { class: 'two' }, field('Resgate', resgate), field('Rende (texto)', rende)), field('Para que serve', nota),
       Object.assign(h('details', { class: 'mais' }, h('summary', null, 'Mais: imposto e partes'),
         h('div', { class: 'stack' },
@@ -2550,7 +2563,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       if (isNaN(s)) { toast('Saldo inválido.'); return; }
       const m = meta.value.trim() ? parseCent(meta.value) : null;
       const rec = { id: cx ? cx.id : uid(), nome: nome.value.trim(), banco: banco.value.trim(), grupo: grupo.value, meta: m && m > 0 ? m : null, rende: rende.value.trim(), resgate: resgate.value.trim(), nota: nota.value.trim(), saldoBase: cx ? cx.saldoBase : s, baseEm: cx ? cx.baseEm : Date.now() };
-      if (rec.meta && soma.length) rec.somaCom = soma.filter((id) => cxById(id));
+      if (rec.meta) rec.somaCom = soma.filter((id) => cxById(id));
       if (rec.meta && metaAte.value) rec.metaAte = metaAte.value;
       const ap = aplic.value.trim() ? parseCent(aplic.value) : 0;
       if (isNaN(ap) || ap < 0) { toast('"Quanto aplicou" inválido.'); return; }
