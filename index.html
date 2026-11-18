@@ -112,6 +112,7 @@ button { cursor: pointer; }
 .tile { align-content: start; }
 .tile .meta-l b { color: var(--ink); font-weight: 600; }
 .tile .so-t { display: inline-block; margin-left: 6px; padding: 1px 7px; border: 1px solid var(--line); border-radius: 999px; font-size: .72rem; color: var(--muted); cursor: pointer; }
+#months, #months button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .tiles .tile { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .tile.arrastando { position: relative; z-index: 5; box-shadow: 0 12px 28px rgba(36, 26, 74, .25); transition: box-shadow .15s; opacity: .95; }
 .tile.alvo { outline: 2px dashed var(--tang); outline-offset: 2px; }
@@ -536,7 +537,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.21.0';
+  const VERSAO = '2.21.1';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -1136,8 +1137,12 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     if (mes < ini) ini = mes;
     let fim = addMonths(now, 2); if (mes > fim) fim = mes;
     const ms = []; for (let m = ini; m <= fim; m = addMonths(m, 1)) ms.push(m);
-    // segurar um mês abre o calendário dele (o mesmo do toque no Gastou)
-    box.replaceChildren(...ms.map((m) => { const b = h('button', { type: 'button', 'aria-pressed': String(m === mes), 'aria-label': mLong(m), onclick: () => { if (segurou) { segurou = false; return; } mes = m; render(); } }, h('b', null, cap(mShort(m))), h('small', null, m.slice(0, 4))); segurar(b, () => { mes = m; render(); openDetalhe('gastou'); }); return b; }));
+    // dois toques num mês abrem o calendário dele (o mesmo do toque no Gastou)
+    box.replaceChildren(...ms.map((m) => h('button', { type: 'button', 'aria-pressed': String(m === mes), 'aria-label': mLong(m), onclick: () => {
+      const agora = Date.now(), duplo = toqueMes.m === m && agora - toqueMes.t < 400;
+      toqueMes = duplo ? { m: '', t: 0 } : { m, t: agora };
+      mes = m; render(); if (duplo) openDetalhe('gastou');
+    } }, h('b', null, cap(mShort(m))), h('small', null, m.slice(0, 4)))));
     const sel = box.querySelector('[aria-pressed="true"]');
     if (sel) box.scrollLeft = sel.offsetLeft - box.clientWidth / 2 + sel.clientWidth / 2;
   }
@@ -1519,6 +1524,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   // "só esta": a conta de quanto guardar por mês sem somar as outras (escolha fica neste aparelho)
   let cxSo = (() => { try { return JSON.parse(lsGet('plin-cx-so') || '[]'); } catch (e) { return []; } })();
   // segurar e arrastar uma caixinha muda a ordem dentro do grupo (salva em cfg.ordemCx)
+  let toqueMes = { m: '', t: 0 };
   async function moverCx(cs, de, para) {
     if (para === de || para < 0) return;
     const ids = cs.map((c) => c.id); const [x] = ids.splice(de, 1); ids.splice(para, 0, x);
@@ -2165,6 +2171,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.21.1', 'O calendário do mês agora abre com dois toques no mês lá em cima (segurar ativava a pesquisa do Google).'],
     ['2.21.0', 'Segurando e arrastando uma caixinha dá pra mudar a ordem dentro do grupo. Segurando um mês lá em cima abre o calendário de gastos dele.'],
     ['2.20.0', 'Caixinhas: líquido sem imposto de renda (tocando no total aparece a conta), cada caixinha mostra quanto está livre agora e tem um "mais" com o resto, partes que liberam avisam sozinhas no dia e no checklist do mês, meta com prazo mostra quanto guardar por mês (juntando ou não com a outra caixinha do mesmo objetivo), e no último dia útil o checklist pede pra conferir os saldos com o banco. Com internet, o CDI e as cotações do dólar e do euro se atualizam sozinhos.'],
     ['2.19.1', 'No calendário do mês, tocar num dia mostra os gastos daquele dia logo embaixo. No extrato, tocar num dia sem gastos avisa "Sem gastos nesse dia" (e não seleciona mais o texto).'],
