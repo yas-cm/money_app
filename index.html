@@ -110,6 +110,7 @@ button { cursor: pointer; }
 .tile .sv { font-family: var(--display); font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
 .tile .sub { font-size: .76rem; }
 .tile { align-content: start; }
+.tile .meta-dest { justify-self: start; margin-top: 2px; background: var(--tang-soft); color: var(--ink); border-radius: 8px; padding: 5px 9px; font-size: .8rem; font-weight: 600; cursor: pointer; }
 .tile .mais-t { justify-self: start; font-size: .76rem; font-weight: 600; color: var(--tang); padding: 4px 0 0; cursor: pointer; }
 .tile .extra { display: grid; gap: 4px; padding-top: 6px; margin-top: 2px; border-top: 1px dashed var(--line); }
 .tile .pt { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; font-size: .76rem; color: var(--muted); }
@@ -1537,10 +1538,10 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
             c.rend || c.lq.ir ? h('span', { class: 'sub aprox' }, [c.rend ? `+${brl(c.rend)} aprox. desde ${dmCurto(inicioRend(c))}` : '', c.lq.ir ? `líquido ${brl(c.lq.liq)}` : ''].filter(Boolean).join(' · ')) : null,
             h('span', { class: 'sub' }, [c.banco, c.rende || (rendeDe(c).tipo !== 'nao' ? rendeTxt(rendeDe(c)) : '')].filter(Boolean).join(' · ')),
             lv ? h('span', { class: 'sub' }, h('b', null, 'Livre agora ' + brl(lv.livre)), lv.preso ? ` · ${brl(lv.preso)} presos até ${dmCurto(lv.ate)}/${lv.ate.slice(2, 4)}` : '') : null,
+            c.porMes != null ? h('span', { class: 'meta-dest', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, (c.porMes ? `Guarde ${brl(c.porMes)}/mês até ${ateTxt(c.metaAte)}` : `Chega até ${ateTxt(c.metaAte)} só rendendo`) + (junto.length ? ` somando com ${junto.map((x) => x.nome).join(' e ')}` : '')) : null,
             temExtra ? h('span', { class: 'mais-t', role: 'button', 'aria-expanded': String(aberta), onclick: (e) => { e.stopPropagation(); cxAbertas = aberta ? cxAbertas.filter((x) => x !== c.id) : [...cxAbertas, c.id]; lsSet('plin-cx-abertas', JSON.stringify(cxAbertas)); renderCaixinhas(); } }, aberta ? 'menos ▴' : 'mais ▾') : null,
             aberta ? h('span', { class: 'extra' },
               c.meta ? h('span', { class: 'sub', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, `Meta: ${Math.floor(naMeta / c.meta * 100)}% de ${brl(c.meta)}` + (junto.length ? ` (${brl(naMeta)} com ${junto.map((x) => x.nome).join(' e ')})` : '') + (naMeta >= c.meta ? ' · meta batida!' : ` · faltam ${brl(c.meta - naMeta)}`)) : null,
-              c.porMes != null ? h('span', { class: 'sub', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, c.porMes ? `Guarde ${brl(c.porMes)}/mês até ${ateTxt(c.metaAte)}` : `Chega até ${ateTxt(c.metaAte)} só rendendo`) : null,
               dono ? h('span', { class: 'sub' }, 'Conta na meta de ' + dono.nome) : null,
               presas.length ? h('span', { class: 'sub' }, 'Partes que liberam:') : null,
               presas.map((pt) => h('span', { class: 'pt' }, h('span', null, fmtD(pt.resgate).replace(/(\d{2}\/\d{2}\/)\d{2}(\d{2})/, '$1$2')), h('span', null, pctTxt(pt.taxa) + '% do CDI'), h('b', null, brl(pt.valor)))),
