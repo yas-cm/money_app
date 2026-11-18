@@ -109,6 +109,11 @@ button { cursor: pointer; }
 .tile .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile .sv { font-family: var(--display); font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
 .tile .sub { font-size: .76rem; }
+.tile { align-content: start; }
+.tile .mais-t { justify-self: start; font-size: .76rem; font-weight: 600; color: var(--tang); padding: 4px 0 0; cursor: pointer; }
+.tile .extra { display: grid; gap: 4px; padding-top: 6px; margin-top: 2px; border-top: 1px dashed var(--line); }
+.tile .pt { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; font-size: .76rem; color: var(--muted); }
+.tile .pt b { color: var(--ink); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 .ribbon { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 2px; background: var(--field); }
 .ribbon i { display: block; height: 100%; }
 .slice { display: grid; grid-template-columns: 3.4rem minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
@@ -938,7 +943,16 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       sh.close(); render(); await salvarCfg();
     };
     if (store.podeGravar()) body.append(h('div', { class: 'row-btns' }, h('button', { class: 'btn' + (p.visto ? ' alt' : ''), type: 'button', style: 'flex:1', onclick: () => marcar(!p.visto) }, p.visto ? 'Desmarcar' : 'Entendi')));
-    const sh = sheet('Parte que libera', body);
+    const sh = sheet(ja ? 'Parte liberada!' : 'Parte que libera', body);
+  }
+  // no dia em que uma parte libera (ou depois, se o app não foi aberto), aparece sozinho, uma vez por dia, até tocar em Entendi
+  function avisoPartes() {
+    if (!carregou || $('sheet-root').firstChild) return;
+    const hoje = todayISO();
+    if (lsGet('plin-aviso-partes') === hoje) return;
+    for (const cx of cfg.caixinhas) for (const p of cx.partes || []) {
+      if (p.resgate && p.resgate <= hoje && p.resgate >= addDia(hoje, -30) && !p.visto) { lsSet('plin-aviso-partes', hoje); openParte(cx.id, p); return; }
+    }
   }
   // no último dia útil: digita o saldo do banco e vê a diferença pro que o Plin estimou
   function openConferir(ym) {
@@ -1488,6 +1502,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     toast('Anotar de novo: confira e toque em Anotar.');
   }
 
+  let cxAbertas = (() => { try { return JSON.parse(lsGet('plin-cx-abertas') || '[]'); } catch (e) { return []; } })();
   function renderCaixinhas() {
     const cxs = cfg.caixinhas.map((c) => { const rd = rendCx(c); return { ...c, rend: rd, atual: saldoCx(c) + rd, lq: liquidoCx(c, rd) }; });
     const total = cxs.reduce((a, c) => a + Math.max(0, c.atual), 0);
@@ -1511,17 +1526,26 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
           const naMeta = c.atual + junto.reduce((a, x) => a + Math.max(0, x.atual), 0);
           const dono = cxs.find((x) => x.meta && (x.somaCom || []).includes(c.id));
           const p = c.meta ? Math.min(1, Math.max(0, naMeta / c.meta)) : 1;
+          const presas = (c.partes || []).filter((pt) => pt.resgate && pt.resgate > todayISO()).sort((a, b) => a.resgate.localeCompare(b.resgate));
+          const lv = (c.partes || []).length ? { preso: presas.reduce((a, pt) => a + pt.valor, 0), ate: presas.length ? presas[presas.length - 1].resgate : '', livre: Math.max(0, c.atual - presas.reduce((a, pt) => a + pt.valor, 0)) } : null;
+          const aberta = cxAbertas.includes(c.id);
+          const temExtra = !!(c.meta || dono || presas.length || c.resgate || c.nota);
           c.porMes = naMeta < (c.meta || 0) ? guardarPorMes(c, [c, ...junto], [Math.max(0, c.atual), ...junto.map((x) => Math.max(0, x.atual))]) : null;
           return h('button', { class: 'tile', type: 'button', onclick: () => openCx(c.id) },
             h('span', { class: 'gauge' }, h('i', { style: `height:${p * 100}%;background:${GRUPOS[k].cor}` })),
             h('span', { class: 'nm' }, c.nome), h('span', { class: 'sv' }, brl(c.atual)),
             c.rend || c.lq.ir ? h('span', { class: 'sub aprox' }, [c.rend ? `+${brl(c.rend)} aprox. desde ${dmCurto(inicioRend(c))}` : '', c.lq.ir ? `líquido ${brl(c.lq.liq)}` : ''].filter(Boolean).join(' · ')) : null,
-            c.meta ? h('span', { class: 'sub', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, `${Math.floor(naMeta / c.meta * 100)}% de ${brl(c.meta)}` + (junto.length ? ` (${brl(naMeta)} com ${junto.map((x) => x.nome).join(' e ')})` : '') + (naMeta >= c.meta ? ' · meta batida!' : ` · faltam ${brl(c.meta - naMeta)}`)) : null,
-            c.porMes != null ? h('span', { class: 'sub', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, c.porMes ? `guarde ${brl(c.porMes)}/mês até ${ateTxt(c.metaAte)}` : `chega até ${ateTxt(c.metaAte)} só rendendo`) : null,
-            dono ? h('span', { class: 'sub' }, 'Conta na meta de ' + dono.nome) : null,
-            proxParte(c) ? h('span', { class: 'sub' }, `parte livre em ${dmCurto(proxParte(c).resgate)}: ${brl(proxParte(c).valor)}`) : null,
-            h('span', { class: 'sub' }, [c.banco, c.rende || (rendeDe(c).tipo !== 'nao' ? rendeTxt(rendeDe(c)) : ''), c.resgate ? 'resgate ' + c.resgate : ''].filter(Boolean).join(' · ')),
-            c.nota ? h('span', { class: 'sub' }, c.nota) : null);
+            h('span', { class: 'sub' }, [c.banco, c.rende || (rendeDe(c).tipo !== 'nao' ? rendeTxt(rendeDe(c)) : '')].filter(Boolean).join(' · ')),
+            lv ? h('span', { class: 'sub' }, h('b', null, 'Livre agora ' + brl(lv.livre)), lv.preso ? ` · ${brl(lv.preso)} presos até ${dmCurto(lv.ate)}/${lv.ate.slice(2, 4)}` : '') : null,
+            temExtra ? h('span', { class: 'mais-t', role: 'button', 'aria-expanded': String(aberta), onclick: (e) => { e.stopPropagation(); cxAbertas = aberta ? cxAbertas.filter((x) => x !== c.id) : [...cxAbertas, c.id]; lsSet('plin-cx-abertas', JSON.stringify(cxAbertas)); renderCaixinhas(); } }, aberta ? 'menos ▴' : 'mais ▾') : null,
+            aberta ? h('span', { class: 'extra' },
+              c.meta ? h('span', { class: 'sub', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, `Meta: ${Math.floor(naMeta / c.meta * 100)}% de ${brl(c.meta)}` + (junto.length ? ` (${brl(naMeta)} com ${junto.map((x) => x.nome).join(' e ')})` : '') + (naMeta >= c.meta ? ' · meta batida!' : ` · faltam ${brl(c.meta - naMeta)}`)) : null,
+              c.porMes != null ? h('span', { class: 'sub', onclick: (e) => { e.stopPropagation(); openMetaCx(c); } }, c.porMes ? `Guarde ${brl(c.porMes)}/mês até ${ateTxt(c.metaAte)}` : `Chega até ${ateTxt(c.metaAte)} só rendendo`) : null,
+              dono ? h('span', { class: 'sub' }, 'Conta na meta de ' + dono.nome) : null,
+              presas.length ? h('span', { class: 'sub' }, 'Partes que liberam:') : null,
+              presas.map((pt) => h('span', { class: 'pt' }, h('span', null, fmtD(pt.resgate).replace(/(\d{2}\/\d{2}\/)\d{2}(\d{2})/, '$1$2')), h('span', null, pctTxt(pt.taxa) + '% do CDI'), h('b', null, brl(pt.valor)))),
+              c.resgate ? h('span', { class: 'sub' }, 'Resgate: ' + c.resgate) : null,
+              c.nota ? h('span', { class: 'sub' }, c.nota) : null) : null);
         }))));
     }
   }
@@ -2960,12 +2984,13 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     if (mes === ymOf(diaVisto) && ymOf(hoje) !== mes) mes = ymOf(hoje); // estava no mês atual: segue pro mês novo
     diaVisto = hoje; if (carregou) render();
   };
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { conferirDia(); buscarTaxas(); } });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { conferirDia(); buscarTaxas(); avisoPartes(); } });
   window.addEventListener('focus', conferirDia);
   setInterval(() => { if (document.visibilityState === 'visible') conferirDia(); }, 60000);
   render();
   store.init().then(() => {
     setTimeout(() => buscarTaxas(), 1500);
+    setTimeout(avisoPartes, 800);
     // veio pelo atalho do ícone (segurar o ícone do Plin > Anotar gasto)
     if (new URLSearchParams(location.search).has('anotar') && carregou) { history.replaceState(null, '', location.pathname + '?app=plin'); openLanc(); }
   });
