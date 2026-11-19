@@ -76,6 +76,8 @@ button { cursor: pointer; }
 .jar { width: 96px; height: 132px; }
 .jar .glass { fill: var(--field); stroke: var(--navy); stroke-width: 2.5; }
 .jar .lid { fill: var(--navy); }
+.jar .edge { fill: none; stroke: var(--navy); stroke-width: 2.5; }
+.jar { overflow: hidden; }
 .jar .fill { fill: var(--mint); transition: y .6s ease, height .6s ease; }
 .jar.over .fill { fill: var(--bad); }
 .big { font-family: var(--display); font-weight: 700; font-size: clamp(1.25rem, 6vw, 2rem); line-height: 1.1; white-space: nowrap; }
@@ -378,9 +380,10 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     <div class="panel hero">
       <svg class="jar" id="jar" viewBox="0 0 96 132" role="img" aria-label="Pote do Livre">
         <rect class="lid" x="20" y="4" width="56" height="12" rx="4"/>
-        <defs><clipPath id="jarclip"><rect x="10" y="20" width="76" height="106" rx="18"/></clipPath></defs>
+        <defs><clipPath id="jarclip"><rect x="14" y="24" width="68" height="98" rx="14"/></clipPath></defs>
         <rect class="glass" x="10" y="20" width="76" height="106" rx="18"/>
         <rect class="fill" id="jar-fill" x="10" y="126" width="76" height="0" clip-path="url(#jarclip)"/>
+        <rect class="edge" x="10" y="20" width="76" height="106" rx="18"/>
       </svg>
       <div style="min-width:0">
         <div class="label" id="livre-label">Ainda livre no mês</div>
@@ -517,9 +520,9 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     </div>
     <div class="panel">
       <h2>Exportar e backup</h2>
-      <p class="sub">A planilha (.csv) abre no Excel. O backup guarda tudo e serve para restaurar ou levar para outro aparelho. Seus dados ficam só neste navegador, então salve um backup de vez em quando.</p>
+      <p class="sub">A planilha (.xlsx) abre no Excel e no Google Planilhas, com abas de lançamentos, meses e categorias. O backup guarda tudo e serve para restaurar ou levar para outro aparelho. Seus dados ficam só neste navegador, então salve um backup de vez em quando.</p>
       <div class="row-btns">
-        <button class="btn" type="button" id="ex-csv">Exportar planilha</button>
+        <button class="btn" type="button" id="ex-xlsx">Exportar planilha (.xlsx)</button>
         <button class="btn alt" type="button" id="ex-bkp">Salvar backup</button>
         <button class="btn alt" type="button" id="ex-mandar" hidden>Mandar backup</button>
         <label class="btn alt" for="im-bkp">Importar backup</label>
@@ -537,7 +540,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.21.1';
+  const VERSAO = '2.22.0';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -1158,8 +1161,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     $('livre-label').textContent = meta > 0 ? (futuro ? 'Livre previsto no mês' : 'Ainda livre no mês') : 'Gastou no mês';
     const resta = meta - d.gastou;
     const frac = meta > 0 ? Math.max(0, Math.min(1, resta / meta)) : 0;
-    const fill = $('jar-fill'); const H = 106;
-    fill.setAttribute('y', String(20 + H * (1 - frac))); fill.setAttribute('height', String(H * frac));
+    const fill = $('jar-fill'); const H = 98; // por dentro da borda do pote
+    fill.setAttribute('y', String(24 + H * (1 - frac))); fill.setAttribute('height', String(H * frac));
     $('jar').classList.toggle('over', meta > 0 && resta < 0);
     if (meta > 0 && resta < 0) { fill.setAttribute('y', '108'); fill.setAttribute('height', '18'); }
     const big = $('livre-resta');
@@ -1296,8 +1299,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     // sem divisão fixa: mostra o que sobrou do que entrou
     const sobra = d.entrou - d.gastou - d.guardou;
     const frac = d.entrou > 0 ? Math.max(0, Math.min(1, sobra / d.entrou)) : 0;
-    const fill = $('jar-fill'); const H = 106;
-    fill.setAttribute('y', String(20 + H * (1 - frac))); fill.setAttribute('height', String(H * frac));
+    const fill = $('jar-fill'); const H = 98; // por dentro da borda do pote
+    fill.setAttribute('y', String(24 + H * (1 - frac))); fill.setAttribute('height', String(H * frac));
     $('jar').classList.toggle('over', sobra < 0);
     if (sobra < 0) { fill.setAttribute('y', '108'); fill.setAttribute('height', '18'); }
     $('livre-label').textContent = 'Sobrou no mês';
@@ -2171,6 +2174,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.22.0', 'Planilha em .xlsx de verdade (abas Lançamentos, Meses e Gastos por categoria, com datas e valores que dá pra somar). E o que fica dentro do pote não passa mais da borda.'],
     ['2.21.1', 'O calendário do mês agora abre com dois toques no mês lá em cima (segurar ativava a pesquisa do Google).'],
     ['2.21.0', 'Segurando e arrastando uma caixinha dá pra mudar a ordem dentro do grupo. Segurando um mês lá em cima abre o calendário de gastos dele.'],
     ['2.20.0', 'Caixinhas: líquido sem imposto de renda (tocando no total aparece a conta), cada caixinha mostra quanto está livre agora e tem um "mais" com o resto, partes que liberam avisam sozinhas no dia e no checklist do mês, meta com prazo mostra quanto guardar por mês (juntando ou não com a outra caixinha do mesmo objetivo), e no último dia útil o checklist pede pra conferir os saldos com o banco. Com internet, o CDI e as cotações do dólar e do euro se atualizam sozinhos.'],
@@ -2889,7 +2893,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   // ---------- backup e planilha ----------
   async function oferecerArquivo(filename, data) {
     try {
-      const tipo = filename.endsWith('.csv') ? 'text/csv;charset=utf-8' : 'application/json';
+      const tipo = filename.endsWith('.xlsx') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/json';
       const url = URL.createObjectURL(new Blob([data], { type: tipo }));
       const a = h('a', { href: url, download: filename }); document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10000);
@@ -2957,18 +2961,113 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     }
     return { cfg: c, meses: m };
   }
-  function csv() {
-    const q = (s) => '"' + String(s ?? '').replace(/"/g, '""') + '"';
-    const linhas = [['Data', 'Tipo', 'Valor', 'Categoria', 'Descrição', 'Caixinha'].join(';')];
-    for (const l of all().sort((a, b) => a.data.localeCompare(b.data))) {
+  // ---------- planilha .xlsx (feita aqui mesmo, sem biblioteca) ----------
+  // zip "guardado" (sem compressão): o Excel, o Google Planilhas e o LibreOffice abrem normal
+  const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zipar(arqs) {
+    const enc = new TextEncoder(); const partes = []; const central = []; let off = 0;
+    const agora = new Date(); const dt = ((agora.getFullYear() - 1980) << 9) | ((agora.getMonth() + 1) << 5) | agora.getDate(); const tm = (agora.getHours() << 11) | (agora.getMinutes() << 5) | (agora.getSeconds() >> 1);
+    for (const [nome, txt] of arqs) {
+      const n = enc.encode(nome), d = enc.encode(txt), crc = crc32(d);
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+      lh.setUint16(10, tm, true); lh.setUint16(12, dt, true); lh.setUint32(14, crc, true); lh.setUint32(18, d.length, true); lh.setUint32(22, d.length, true);
+      lh.setUint16(26, n.length, true); lh.setUint16(28, 0, true);
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+      ch.setUint16(12, tm, true); ch.setUint16(14, dt, true); ch.setUint32(16, crc, true); ch.setUint32(20, d.length, true); ch.setUint32(24, d.length, true);
+      ch.setUint16(28, n.length, true); ch.setUint32(42, off, true);
+      partes.push(new Uint8Array(lh.buffer), n, d); central.push(new Uint8Array(ch.buffer), n);
+      off += 30 + n.length + d.length;
+    }
+    const tamC = central.reduce((a, x) => a + x.length, 0);
+    const fim = new DataView(new ArrayBuffer(22));
+    fim.setUint32(0, 0x06054b50, true); fim.setUint16(8, arqs.length, true); fim.setUint16(10, arqs.length, true); fim.setUint32(12, tamC, true); fim.setUint32(16, off, true);
+    return new Blob([...partes, ...central, new Uint8Array(fim.buffer)]);
+  }
+  // célula: string, número, {d:'AAAA-MM-DD'} data, {v, f} fórmula; s = estilo (1 cabeçalho, 2 data, 3 reais, 4 reais em negrito)
+  function xlsxBlob(abas) {
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+    const col = colLetra;
+    const serial = (iso) => { const [y, m, d] = iso.split('-').map(Number); return (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000; };
+    const celula = (v, ref, s) => {
+      if (v == null || v === '') return s ? `<c r="${ref}" s="${s}"/>` : '';
+      const st = s ? ` s="${s}"` : '';
+      if (typeof v === 'number') return `<c r="${ref}"${st}><v>${Math.round(v * 100) / 100}</v></c>`;
+      if (v.d) return `<c r="${ref}" s="2"><v>${serial(v.d)}</v></c>`;
+      if (v.f) return `<c r="${ref}"${st}><f>${esc(v.f)}</f><v>${Math.round(v.v * 100) / 100}</v></c>`;
+      return `<c r="${ref}" t="inlineStr"${st}><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
+    };
+    const folha = (a) => {
+      const larg = a.larguras.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('');
+      const linhas = a.linhas.map((ln, r) => `<row r="${r + 1}">` + ln.map((v, c) => celula(v, col(c) + (r + 1), r === 0 ? 1 : (a.estilos && a.estilos[c]) || 0)).join('') + '</row>').join('');
+      const ult = col(a.larguras.length - 1) + a.linhas.length;
+      return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        + '<sheetViews><sheetView workbookViewId="0"><pane ' + (a.congelaCol ? 'xSplit="1" ' : '') + `ySplit="1" topLeftCell="${a.congelaCol ? 'B2' : 'A2'}" activePane="${a.congelaCol ? 'bottomRight' : 'bottomLeft'}" state="frozen"/></sheetView></sheetViews>`
+        + `<cols>${larg}</cols><sheetData>${linhas}</sheetData>` + (a.filtro && a.linhas.length > 1 ? `<autoFilter ref="A1:${ult}"/>` : '') + '</worksheet>';
+    };
+    const ns = 'http://schemas.openxmlformats.org';
+    const arqs = [
+      ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="${ns}/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>`
+        + abas.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') + '</Types>'],
+      ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${ns}/package/2006/relationships"><Relationship Id="rId1" Type="${ns}/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+      ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="${ns}/spreadsheetml/2006/main" xmlns:r="${ns}/officeDocument/2006/relationships"><sheets>`
+        + abas.map((a, i) => `<sheet name="${esc(a.nome)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets>'
+        + (abas.some((a) => a.filtro) ? '<definedNames>' + abas.map((a, i) => a.filtro && a.linhas.length > 1 ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${esc(a.nome)}'!$A$1:$${col(a.larguras.length - 1)}$${a.linhas.length}</definedName>` : '').join('') + '</definedNames>' : '') + '</workbook>'],
+      ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${ns}/package/2006/relationships">`
+        + abas.map((_, i) => `<Relationship Id="rId${i + 1}" Type="${ns}/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')
+        + `<Relationship Id="rId${abas.length + 1}" Type="${ns}/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+      ['xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${ns}/spreadsheetml/2006/main">`
+        + '<numFmts count="2"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="&quot;R$&quot; #,##0.00;[Red]-&quot;R$&quot; #,##0.00"/></numFmts>'
+        + '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>'
+        + '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF5B4B8A"/><bgColor indexed="64"/></patternFill></fill></fills>'
+        + '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        + '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs>'
+        + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'],
+      ...abas.map((a, i) => [`xl/worksheets/sheet${i + 1}.xml`, folha(a)]),
+    ];
+    return zipar(arqs);
+  }
+  // três abas: todos os lançamentos, o resumo de cada mês e os gastos por categoria mês a mês
+  function planilhaXlsx() {
+    const lanc = [['Data', 'Tipo', 'Valor', 'Categoria', 'Descrição', 'Caixinha']];
+    const todos = all().slice().sort((a, b) => a.data.localeCompare(b.data) || (a.criadoEm || 0) - (b.criadoEm || 0));
+    for (const l of todos) {
       const cat = l.tipo === 'gasto' || l.tipo === 'entrada' ? catById(l.tipo, l.cat).nome : '';
       const cx = cxById(l.caixinha || l.origem);
       const cxNome = l.tipo === 'transferir' ? `${nomeCx(l.caixinha)} → ${nomeCx(l.para)}` : cx ? cx.nome : '';
-      const sinal = l.tipo === 'gasto' || l.tipo === 'guardar' ? '-' : '';
-      linhas.push([l.data.split('-').reverse().join('/'), cap(l.tipo), (l.tipo === 'transferir' ? '' : sinal) + centStr(l.valor).replace(/\./g, ''), q(cat), q(l.desc), q(cxNome)].join(';'));
+      const sinal = l.tipo === 'gasto' || l.tipo === 'guardar' ? -1 : 1;
+      lanc.push([{ d: l.data }, cap(l.tipo), (l.valor || 0) / 100 * sinal, cat, l.desc || '', cxNome]);
     }
-    return '﻿' + linhas.join('\r\n');
+    const yms = Object.keys(meses).filter((ym) => (meses[ym] || []).length).sort();
+    const nomeMes = (ym) => `${mShort(ym)}/${ym.slice(0, 4)}`;
+    const res = [['Mês', 'Entrou', 'Gastou (Livre)', 'Gastou (de caixinha)', 'Guardou', 'Sobrou']];
+    yms.forEach((ym, i) => {
+      const d = doMes(ym); const r = i + 2;
+      res.push([nomeMes(ym), d.entrou / 100, d.gastou / 100, d.gastoCx / 100, d.guardou / 100, { f: `B${r}-C${r}-E${r}`, v: (d.entrou - d.gastou - d.guardou) / 100 }]);
+    });
+    if (yms.length) {
+      const u = yms.length + 1; const soma = (j) => res.slice(1).reduce((a, ln) => a + (typeof ln[j] === 'number' ? ln[j] : ln[j].v), 0);
+      res.push(['Total', ...[1, 2, 3, 4, 5].map((j) => ({ f: `SUM(${colLetra(j)}2:${colLetra(j)}${u})`, v: soma(j) }))]);
+    }
+    const porCat = new Map();
+    for (const l of todos) if (l.tipo === 'gasto') {
+      const nome = catById('gasto', l.cat).nome; const m = porCat.get(nome) || {};
+      const ym = ymOf(l.data); m[ym] = (m[ym] || 0) + l.valor; porCat.set(nome, m);
+    }
+    const cats = [...porCat.entries()].map(([n, m]) => [n, m, Object.values(m).reduce((a, x) => a + x, 0)]).sort((a, b) => b[2] - a[2]);
+    const cg = [['Categoria', ...yms.map(nomeMes), 'Total']];
+    cats.forEach(([n, m, tot], i) => { const r = i + 2; cg.push([n, ...yms.map((ym) => m[ym] ? m[ym] / 100 : ''), { f: `SUM(B${r}:${colLetra(yms.length)}${r})`, v: tot / 100 }]); });
+    if (cats.length) { const u = cats.length + 1; cg.push(['Total', ...[...yms, 'T'].map((ym, j) => { const c = colLetra(j + 1); const v = ym === 'T' ? cats.reduce((a, x) => a + x[2], 0) : cats.reduce((a, x) => a + (x[1][ym] || 0), 0); return { f: `SUM(${c}2:${c}${u})`, v: v / 100 }; })]); }
+    return xlsxBlob([
+      { nome: 'Lançamentos', linhas: lanc, larguras: [12, 11, 14, 18, 36, 22], estilos: [2, 0, 3], filtro: true },
+      { nome: 'Meses', linhas: res, larguras: [11, 14, 15, 19, 14, 14], estilos: [0, 3, 3, 3, 3, 3] },
+      { nome: 'Gastos por categoria', linhas: cg, larguras: [20, ...yms.map(() => 11), 14], estilos: [0, ...yms.map(() => 3), 3], congelaCol: true },
+    ]);
   }
+  function colLetra(i) { let s = ''; i++; while (i) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = (i - 1 - r) / 26; } return s; }
+
 
   // ---------- ligações ----------
   function showTab() {
@@ -3016,7 +3115,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   $('ex-bkp').addEventListener('click', salvarBackup);
   $('ex-mandar').hidden = !podeMandar();
   $('ex-mandar').addEventListener('click', mandarBackup);
-  $('ex-csv').addEventListener('click', () => oferecerArquivo(`plin-${todayISO()}.csv`, csv()));
+  $('ex-xlsx').addEventListener('click', () => oferecerArquivo(`plin-${todayISO()}.xlsx`, planilhaXlsx()));
   $('im-bkp').addEventListener('change', async (e) => {
     const f = e.target.files && e.target.files[0]; e.target.value = '';
     if (!f || bloqueado()) return;

@@ -11,7 +11,7 @@ Caderneta de bolso para o dinheiro do mês: anotar gastos e entradas, guardar em
 - **Caixinhas**: saldo, meta, banco, rendimento e resgate; meta que soma o saldo de outras caixinhas.
 - **Plano**: em cima, o plano que vale no mês escolhido (o padrão ou um plano só daquele mês, com "Mudar só este mês" e "Voltar ao padrão"); embaixo, o plano padrão recolhível (renda prevista, divisão em potes Livre/Investimentos/Viagens/13º e aportes de todo mês); gastos fixos (assinaturas), lembretes e gastos planejados.
 - **Gráficos**: gasto por categoria, mês a mês e maiores gastos do período.
-- **Config**: categorias (com cor, teto e arquivar), planilha .csv para o Excel e backup .json.
+- **Config**: categorias (com cor, teto e arquivar), planilha .xlsx para o Excel e backup .json.
 
 ## Rodar localmente
 
