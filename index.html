@@ -150,6 +150,9 @@ button { cursor: pointer; }
 .chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: .84rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .opt { display: flex; gap: 10px; align-items: flex-start; font-weight: 600; }
+.pg-chips .chip, .pra-chips .chip { font-size: .85rem; }
+.pra-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pra-row input { flex: 1 1 120px; min-width: 0; background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
 .opt input { margin-top: 3px; width: 18px; height: 18px; flex: none; accent-color: var(--tang); }
 .opt small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; margin-top: 2px; }
 .es .en { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
@@ -426,7 +429,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       <button class="rend-l" type="button" id="cx-rend"></button>
     </div>
     <div id="cx-list" class="stack" style="gap:18px"></div>
-    <div class="row-btns"><button class="btn alt" type="button" id="cx-transf" style="flex:1">Transferir</button><button class="btn alt" type="button" id="cx-new" style="flex:1">Nova caixinha</button></div>
+    <div class="panel" id="cc-p"><div class="grp-h"><h2>Cartão e dinheiro vivo</h2></div><div id="cc-list"></div></div>
+    <div class="row-btns"><button class="btn alt" type="button" id="cx-transf" style="flex:1">Transferir</button><button class="btn alt" type="button" id="cx-sacar" style="flex:1">Sacar</button><button class="btn alt" type="button" id="cx-new" style="flex:1">Nova caixinha</button></div>
   </section>
 
   <section id="plano" data-screen hidden class="stack">
@@ -496,6 +500,10 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       <div class="chart" id="gr-mes"></div>
       <div class="readout" id="gr-read"></div>
     </div>
+    <div class="panel" id="gr-pra-p" hidden>
+      <div class="grp-h"><h2>Pra quem</h2><span class="sub">gastos com etiqueta de pessoa</span></div>
+      <div class="conta"><div class="ledger" id="gr-pra"></div></div>
+    </div>
     <div class="panel">
       <h2 id="gr-top-t">Maiores gastos do período</h2>
       <div id="gr-top"></div>
@@ -511,6 +519,12 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       </div>
       <div class="chips cat-grade compacta" id="cg-list"></div>
       <div class="row-btns"><button class="btn alt" type="button" id="cg-new">Nova categoria</button></div>
+    </div>
+    <div class="panel">
+      <h2>Cartão de crédito</h2>
+      <p class="sub">Com o cartão cadastrado, o Plin mostra em qual fatura cai cada gasto e avisa no dia de pagar.</p>
+      <div id="ct-list"></div>
+      <div class="row-btns"><button class="btn alt" type="button" id="ct-new">Cadastrar cartão</button></div>
     </div>
     <div class="panel">
       <h2>Neste aparelho</h2>
@@ -540,7 +554,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 <script>
 (function () {
   'use strict';
-  const VERSAO = '2.22.0';
+  const VERSAO = '2.23.0';
   const $ = (id) => document.getElementById(id);
   const erros = [];
   function showErr(msg) { erros.push(msg); const n = $('notice'); n.hidden = false; n.textContent = 'Algo deu errado: ' + msg + '. Recarregue a página; se continuar, salve um backup.'; }
@@ -786,6 +800,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   function movCx(l, id) {
     if (l.tipo === 'guardar') return l.caixinha === id ? l.valor : 0;
     if (l.tipo === 'resgatar') return l.caixinha === id ? -l.valor : 0;
+    if (l.tipo === 'sacar' || l.tipo === 'fatura') return l.caixinha === id ? -l.valor : 0;
     if (l.tipo === 'gasto') return l.origem === id ? -l.valor : 0;
     if (l.tipo === 'transferir') return l.caixinha === id ? -l.valor : l.para === id ? l.valor : 0;
     return 0;
@@ -927,6 +942,161 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     if (falta <= 0) return 0;
     return Math.ceil(i > 0 ? falta * i / (Math.pow(1 + i, n) - 1) : falta / n);
   }
+  // ---------- 2.23.0: forma de pagamento (cartão, dinheiro vivo), carteira e etiqueta de pessoa ----------
+  const MOEDAS = { brl: 'R$', usd: 'US$', eur: '€', pyg: '₲' };
+  const MOEDAS_OP = ['brl', 'usd', 'eur'];
+  const fmtMoeda = (m, c) => (m === 'brl' || !m ? brl(c) : oculto ? MOEDAS[m] + ' •••' : m === 'pyg' ? '₲ ' + Math.round((c || 0) / 100).toLocaleString('pt-BR') : MOEDAS[m] + ' ' + centStr(c));
+  const cartoes = () => cfg.cartoes || [];
+  const cartaoDe = (l) => cartoes().find((c) => c.id === l.cartao) || cartoes()[0] || null;
+  const diaNo = (ym, d) => ym + '-' + String(Math.min(d, diasNoMes(ym))).padStart(2, '0');
+  // fatura = mês em que ela vence. Compra no dia do fechamento ou depois vai pra próxima.
+  function faturaDe(l, c) {
+    c = c || cartaoDe(l); if (!c) return null;
+    let ym = ymOf(l.data);
+    if (+l.data.slice(8, 10) >= Math.min(c.fecha, diasNoMes(ym))) ym = addMonths(ym, 1);
+    return c.vence <= c.fecha ? addMonths(ym, 1) : ym;
+  }
+  const venceEm = (c, ym) => diaNo(ym, c.vence);
+  const fechaEm = (c, ym) => diaNo(c.vence <= c.fecha ? addMonths(ym, -1) : ym, c.fecha);
+  const doCartao = (l, c) => l.tipo === 'gasto' && l.pg === 'cartao' && (cartaoDe(l) || {}).id === c.id;
+  const gastosFatura = (c, ym) => all().filter((l) => doCartao(l, c) && faturaDe(l, c) === ym).sort((a, b) => a.data.localeCompare(b.data));
+  const somaV = (ls) => ls.reduce((a, l) => a + l.valor, 0);
+  const pagaFatura = (c, ym) => all().find((l) => l.tipo === 'fatura' && l.cartao === c.id && l.fatura === ym);
+  // dinheiro vivo: sacar põe, gastar em dinheiro tira (cada moeda separada)
+  function carteira() {
+    const s = { brl: 0 }, hoje = todayISO();
+    for (const l of all()) {
+      if (l.data > hoje) continue;
+      if (l.tipo === 'sacar') { const m = l.moeda || 'brl'; s[m] = (s[m] || 0) + (m === 'brl' ? l.valor : l.recebido || 0); }
+      else if (l.tipo === 'gasto' && l.pg === 'dinheiro') { const m = l.orig ? l.orig.moeda : 'brl'; s[m] = (s[m] || 0) - (l.orig ? l.orig.valor : l.valor); }
+    }
+    return s;
+  }
+  function pessoasUsadas() { const n = {}; for (const l of all()) if (l.pra) n[l.pra] = (n[l.pra] || 0) + 1; return Object.keys(n).sort((a, b) => n[b] - n[a]); }
+  const pgTxt = (l) => (l.pg === 'cartao' ? 'cartão' + (cartoes().length > 1 && cartaoDe(l) ? ' ' + cartaoDe(l).nome : '') : l.pg === 'dinheiro' ? 'dinheiro' + (l.orig && l.orig.moeda !== 'brl' ? ' ' + fmtMoeda(l.orig.moeda, l.orig.valor) : '') : '');
+
+  function renderCartaoDinheiro() {
+    const el = $('cc-list'); if (!el) return;
+    const rows = [];
+    for (const c of cartoes()) {
+      const ym = faturaDe({ data: todayISO() }, c), tot = somaV(gastosFatura(c, ym));
+      rows.push(h('button', { class: 'en', type: 'button', onclick: () => openFaturas(c.id) }, h('span', { class: 't' }, 'Cartão ' + c.nome), h('span', { class: 'v' }, brl(tot)), h('span', { class: 'meta' }, `fatura aberta · fecha ${dmCurto(fechaEm(c, ym))} · vence ${dmCurto(venceEm(c, ym))}`)));
+    }
+    const ct = carteira(), outras = Object.keys(ct).filter((m) => m !== 'brl' && ct[m]);
+    rows.push(h('button', { class: 'en', type: 'button', onclick: () => openCarteira() }, h('span', { class: 't' }, 'Dinheiro vivo'), h('span', { class: 'v' + (ct.brl < 0 ? ' neg' : '') }, fmtMoeda('brl', ct.brl)), h('span', { class: 'meta' }, outras.length ? outras.map((m) => fmtMoeda(m, ct[m])).join(' · ') : 'na carteira')));
+    el.replaceChildren(...rows);
+    const ctl = $('ct-list');
+    if (ctl) ctl.replaceChildren(...cartoes().map((c) => h('button', { class: 'en', type: 'button', onclick: () => openCartao(c) }, h('span', { class: 't' }, c.nome), h('span', { class: 'v muted' }, ''), h('span', { class: 'meta' }, `fecha dia ${c.fecha} · vence dia ${c.vence}`))));
+  }
+  function openCartao(c) {
+    if (bloqueado()) return;
+    const nome = h('input', { type: 'text', id: 'ct-nome', value: c ? c.nome : '', placeholder: 'Ex.: Nubank' });
+    const fecha = h('input', { type: 'text', inputmode: 'numeric', id: 'ct-fecha', value: c ? String(c.fecha) : '', placeholder: 'Ex.: 8' });
+    const vence = h('input', { type: 'text', inputmode: 'numeric', id: 'ct-vence', value: c ? String(c.vence) : '', placeholder: 'Ex.: 15' });
+    const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, c ? 'Salvar' : 'Cadastrar');
+    const usado = c && all().some((l) => l.cartao === c.id);
+    const body = h('div', { class: 'stack', style: 'gap:12px' }, field('Nome', nome), h('div', { class: 'two' }, field('Fecha no dia', fecha), field('Vence no dia', vence)),
+      h('p', { class: 'sub' }, 'Os dias aparecem no app do banco. Compra feita no dia do fechamento ou depois cai na fatura seguinte.'),
+      h('div', { class: 'row-btns' }, save, c && !usado ? dangerBtn('Excluir', async () => { cfg.cartoes = cartoes().filter((x) => x.id !== c.id); sh.close(); render(); await salvarCfg(); toast('Cartão excluído.'); }) : null));
+    const sh = sheet(c ? c.nome : 'Cadastrar cartão', body);
+    save.addEventListener('click', async () => {
+      const f = parseInt(fecha.value, 10), v = parseInt(vence.value, 10);
+      if (!nome.value.trim()) { toast('Dê um nome.'); return; }
+      if (!(f >= 1 && f <= 31 && v >= 1 && v <= 31)) { toast('Os dias vão de 1 a 31.'); return; }
+      const rec = { id: c ? c.id : uid(), nome: nome.value.trim(), fecha: f, vence: v };
+      cfg.cartoes = c ? cartoes().map((x) => (x.id === c.id ? rec : x)) : [...cartoes(), rec];
+      sh.close(); render(); await salvarCfg(); toast('Salvo.');
+    });
+  }
+  function openFaturas(cId) {
+    const c = cartoes().find((x) => x.id === cId); if (!c) return;
+    const aberta = faturaDe({ data: todayISO() }, c);
+    const ks = new Set(all().filter((l) => doCartao(l, c)).map((l) => faturaDe(l, c))); ks.add(aberta);
+    const lista = [...ks].filter((ym) => ym >= addMonths(aberta, -1) || !pagaFatura(c, ym)).sort();
+    const body = h('div', { class: 'stack conta', style: 'gap:18px' });
+    for (const ym of lista) {
+      const gs = gastosFatura(c, ym), tot = somaV(gs), pg = pagaFatura(c, ym);
+      if (!tot && !pg && ym !== aberta) continue;
+      const status = pg ? 'paga' : ym === aberta ? 'aberta' : ym > aberta ? 'próximas' : 'fechada';
+      body.append(h('div', { class: 'stack', style: 'gap:6px' },
+        h('div', { class: 'grp-h' }, h('b', null, `Vence ${fmtD(venceEm(c, ym))}`), h('span', { class: 'sub' }, status + (status === 'aberta' ? ' · fecha ' + dmCurto(fechaEm(c, ym)) : ''))),
+        h('div', { class: 'ledger' }, gs.map((l) => subE(`${dmCurto(l.data)} · ${l.desc || catById('gasto', l.cat).nome}`, l.valor)), linhaE('Total', tot, '=', 'res')),
+        pg ? h('p', { class: 'sub' }, `Paga em ${dmCurto(pg.data)}, ` + (pg.caixinha ? 'com a caixinha ' + nomeCx(pg.caixinha) : 'com o Livre') + '.') : null,
+        !pg && tot && store.podeGravar() ? h('button', { class: 'btn alt', type: 'button', onclick: () => { sh.close(); openPagarFatura(c, ym, tot); } }, 'Paguei esta fatura') : null));
+    }
+    body.append(h('p', { class: 'sub' }, `Fecha todo dia ${c.fecha} e vence todo dia ${c.vence}. Os gastos no cartão já contam no mês da compra; pagar a fatura não conta de novo.`));
+    const sh = sheet('Faturas ' + c.nome, body);
+  }
+  function openPagarFatura(c, ym, tot) {
+    if (bloqueado()) return;
+    const val = moneyInput(tot); val.id = 'ft-val';
+    const sel = h('select', { id: 'ft-de' }, h('option', { value: '' }, 'Dinheiro do mês (Livre)'), cfg.caixinhas.map((x) => h('option', { value: x.id }, 'Caixinha ' + x.nome)));
+    const dt = h('input', { type: 'date', id: 'ft-data', value: todayISO() });
+    const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, 'Paguei');
+    const body = h('div', { class: 'stack', style: 'gap:12px' }, field('Valor pago', val), field('Saiu de', sel), field('Data', dt),
+      h('p', { class: 'sub' }, 'Os gastos já contaram no mês em que foram feitos. Se sair de uma caixinha, o valor volta pro Livre (é como resgatar) e sai da caixinha.'),
+      h('div', { class: 'row-btns' }, save));
+    const sh = sheet(`Fatura ${c.nome} · ${mShort(ym)}`, body);
+    save.addEventListener('click', async () => {
+      const v = parseCent(val.value);
+      if (!(v > 0)) { toast('Digite o valor.'); return; }
+      const rec = { id: uid(), tipo: 'fatura', valor: v, cartao: c.id, fatura: ym, data: dt.value || todayISO(), desc: `Fatura ${c.nome} (${mShort(ym)})`, criadoEm: Date.now(), atualizadoEm: Date.now() };
+      if (sel.value) rec.caixinha = sel.value;
+      sh.close(); await porLanc(rec);
+      toast('Fatura paga.', { label: 'Desfazer', fn: () => tirarLanc(rec) });
+    });
+  }
+  function openSacar() {
+    if (bloqueado()) return;
+    let m = 'brl';
+    const val = moneyInput(null); val.id = 'sq-val';
+    const rec = moneyInput(null); rec.id = 'sq-rec';
+    const recF = field('Quanto recebeu', rec);
+    const chips = h('div', { class: 'chips' });
+    const pinta = () => { chips.replaceChildren(...MOEDAS_OP.map((k) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(m === k), onclick: () => { m = k; pinta(); } }, MOEDAS[k]))); recF.hidden = m === 'brl'; recF.firstChild.textContent = `Quanto recebeu (${MOEDAS[m]})`; };
+    pinta();
+    const sel = h('select', { id: 'sq-de' }, h('option', { value: '' }, 'Dinheiro do mês (Livre)'), cfg.caixinhas.map((x) => h('option', { value: x.id }, 'Caixinha ' + x.nome)));
+    const desc = h('input', { type: 'text', id: 'sq-desc', placeholder: 'Ex.: câmbio pro Paraguai (opcional)' });
+    const dt = h('input', { type: 'date', id: 'sq-data', value: todayISO() });
+    const save = h('button', { class: 'btn', type: 'button', style: 'flex:1' }, 'Sacar');
+    const body = h('div', { class: 'stack', style: 'gap:12px' }, field('Quanto saiu da conta (R$)', val), h('div', { class: 'field' }, h('span', null, 'Em qual moeda'), chips), recF, field('Saiu de', sel), field('Descrição', desc), field('Data', dt),
+      h('p', { class: 'sub' }, 'Sacar não é gasto: o dinheiro só muda de lugar. O gasto conta quando você anota "Pagou com: Dinheiro".'),
+      h('div', { class: 'row-btns' }, save));
+    const sh = sheet('Sacar dinheiro', body);
+    save.addEventListener('click', async () => {
+      const v = parseCent(val.value);
+      if (!(v > 0)) { toast('Digite quanto saiu da conta.'); return; }
+      const r = m === 'brl' ? v : parseCent(rec.value);
+      if (!(r > 0)) { toast('Digite quanto recebeu.'); return; }
+      const l = { id: uid(), tipo: 'sacar', valor: v, moeda: m, data: dt.value || todayISO(), desc: desc.value.trim() || (m === 'brl' ? 'Saque' : 'Câmbio ' + MOEDAS[m]), criadoEm: Date.now(), atualizadoEm: Date.now() };
+      if (m !== 'brl') l.recebido = r;
+      if (sel.value) l.caixinha = sel.value;
+      sh.close(); mes = ymOf(l.data); await porLanc(l);
+      toast(`Sacado. Dinheiro vivo: ${fmtMoeda(m, carteira()[m] || 0)}.`, { label: 'Desfazer', fn: () => tirarLanc(l) });
+    });
+  }
+  function openCarteira() {
+    const ct = carteira();
+    const ms = Object.keys(ct).filter((m) => m === 'brl' || ct[m]);
+    const movs = all().filter((l) => l.tipo === 'sacar' || (l.tipo === 'gasto' && l.pg === 'dinheiro')).sort((a, b) => b.data.localeCompare(a.data)).slice(0, 12);
+    const body = h('div', { class: 'stack conta', style: 'gap:14px' },
+      h('div', { class: 'ledger' }, ms.map((m) => linhaE(m === 'brl' ? 'Reais' : m === 'usd' ? 'Dólares' : m === 'eur' ? 'Euros' : 'Guaranis', fmtMoeda(m, ct[m])))),
+      movs.length ? h('div', { class: 'label' }, 'Últimos movimentos') : null,
+      movs.length ? h('div', { class: 'ledger' }, movs.map((l) => subE(`${dmCurto(l.data)} · ${l.desc || (l.tipo === 'sacar' ? 'Saque' : catById('gasto', l.cat).nome)}`, (l.tipo === 'sacar' ? '+ ' + fmtMoeda(l.moeda || 'brl', l.moeda && l.moeda !== 'brl' ? l.recebido : l.valor) : '− ' + fmtMoeda(l.orig ? l.orig.moeda : 'brl', l.orig ? l.orig.valor : l.valor))))) : h('p', { class: 'sub' }, 'Nada ainda. Toque em Sacar quando tirar dinheiro do banco ou trocar moeda.'),
+      store.podeGravar() ? h('div', { class: 'row-btns' }, h('button', { class: 'btn', type: 'button', style: 'flex:1', onclick: () => { sh.close(); openSacar(); } }, 'Sacar')) : null);
+    const sh = sheet('Dinheiro vivo', body);
+  }
+  // saque e fatura paga: só ver e excluir
+  function openMov(l) {
+    const cx = cxById(l.caixinha);
+    const linhas = l.tipo === 'sacar'
+      ? [linhaE('Saiu da conta', l.valor), l.moeda && l.moeda !== 'brl' ? linhaE('Recebeu', fmtMoeda(l.moeda, l.recebido)) : null, linhaE('Saiu de', cx ? cx.nome : 'Livre')]
+      : [linhaE('Valor pago', l.valor), linhaE('Fatura', mLong(l.fatura)), linhaE('Saiu de', cx ? cx.nome : 'Livre')];
+    const body = h('div', { class: 'stack conta', style: 'gap:14px' }, h('div', { class: 'ledger' }, linhaE('Data', fmtD(l.data)), linhas),
+      store.podeGravar() ? h('div', { class: 'row-btns' }, h('button', { class: 'btn danger', type: 'button', style: 'flex:1', onclick: async () => { sh.close(); await tirarLanc(l); toast('Excluído.', { label: 'Desfazer', fn: () => porLanc(l) }); } }, 'Excluir')) : null);
+    const sh = sheet(l.desc || (l.tipo === 'sacar' ? 'Saque' : 'Fatura'), body);
+  }
+
   const ateTxt = (ym) => `${mShort(ym)}/${ym.slice(2, 4)}`;
   // itens do checklist do mês: partes que liberam e conferir com o banco no último dia útil
   function passosCaixinhas(ym) {
@@ -938,6 +1108,11 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     if (cfg.caixinhas.length) {
       const ud = ultDiaUtil(ym), feito = (cfg.conferidos || {})[ym];
       out.push({ dia: +ud.slice(8, 10), t: 'Conferir caixinhas com o banco', done: !!feito, extra: feito ? 'conferido em ' + dmCurto(feito) : 'dia do salário · toque para conferir', fn: () => openConferir(ym) });
+    }
+    for (const c of cartoes()) {
+      const tot = somaV(gastosFatura(c, ym)), pg = pagaFatura(c, ym);
+      if (!tot && !pg) continue;
+      out.push({ dia: +venceEm(c, ym).slice(8, 10), t: 'Pagar fatura ' + c.nome, done: !!pg, valor: pg ? pg.valor : tot, extra: pg ? 'paga' : `fecha ${dmCurto(fechaEm(c, ym))} · toque para ver`, fn: () => openFaturas(c.id) });
     }
     return out;
   }
@@ -1075,6 +1250,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     for (const l of ls) {
       if (l.tipo === 'entrada') entrou += l.valor;
       else if (l.tipo === 'gasto') { if (l.origem) gastoCx += l.valor; else gastou += l.valor; }
+      else if ((l.tipo === 'sacar' || l.tipo === 'fatura') && l.caixinha) { guardou -= l.valor; const cx = cxById(l.caixinha); if (cx) porGrupo[cx.grupo] = (porGrupo[cx.grupo] || 0) - l.valor; }
       else if (l.tipo === 'guardar' || l.tipo === 'resgatar') {
         const sg = l.tipo === 'guardar' ? 1 : -1; guardou += sg * l.valor;
         const cx = cxById(l.caixinha); if (cx) porGrupo[cx.grupo] = (porGrupo[cx.grupo] || 0) + sg * l.valor;
@@ -1476,6 +1652,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       titulo = l.desc || c.nome;
       tag = [h('span', { class: 'tag' }, marca(c), c.nome)];
       if (l.origem && cxById(l.origem)) tag.push(h('span', null, 'saiu da caixinha ' + cxById(l.origem).nome));
+      if (l.pg) tag.push(h('span', null, pgTxt(l)));
+      if (l.pra) tag.push(h('span', null, 'pra ' + l.pra));
       valor = (l.tipo === 'gasto' ? '− ' : '+ ') + brl(l.valor); cls = l.tipo === 'entrada' ? 'pos' : '';
     } else if (l.tipo === 'transferir') {
       const de = cxById(l.caixinha), pa = cxById(l.para);
@@ -1483,14 +1661,19 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       titulo = l.desc || 'Transferência';
       tag = [h('span', { class: 'tag' }, bola(de), (de ? de.nome : 'caixinha removida') + ' → '), h('span', { class: 'tag' }, bola(pa), pa ? pa.nome : 'caixinha removida')];
       valor = brl(l.valor); cls = 'muted';
+    } else if (l.tipo === 'sacar' || l.tipo === 'fatura') {
+      const cx = cxById(l.caixinha);
+      titulo = l.desc || (l.tipo === 'sacar' ? 'Saque' : 'Fatura do cartão');
+      tag = [h('span', { class: 'tag' }, l.tipo === 'sacar' ? 'pro dinheiro vivo' + (l.moeda && l.moeda !== 'brl' ? ': ' + fmtMoeda(l.moeda, l.recebido || 0) : '') : 'fatura de ' + mShort(l.fatura) + ' paga'), h('span', null, cx ? 'saiu da caixinha ' + cx.nome : 'saiu do Livre')];
+      valor = brl(l.valor); cls = 'muted';
     } else {
       const cx = cxById(l.caixinha);
       titulo = l.desc || (l.tipo === 'guardar' ? 'Guardado' : 'Resgatado');
       tag = [h('span', { class: 'tag' }, h('i', { style: `background:${cx ? GRUPOS[cx.grupo].cor : '#999'};border-radius:50%` }), (l.tipo === 'guardar' ? 'para ' : 'de ') + (cx ? cx.nome : 'caixinha removida'))];
       valor = brl(l.valor); cls = 'muted';
     }
-    const b = h('button', { class: 'en', type: 'button', onclick: () => { if (segurou) { segurou = false; return; } openLanc(l); } }, h('span', { class: 't' }, titulo), h('span', { class: 'v ' + cls }, valor), h('span', { class: 'meta' }, tag));
-    segurar(b, () => anotarDeNovo(l));
+    const b = h('button', { class: 'en', type: 'button', onclick: () => { if (segurou) { segurou = false; return; } if (l.tipo === 'sacar' || l.tipo === 'fatura') openMov(l); else openLanc(l); } }, h('span', { class: 't' }, titulo), h('span', { class: 'v ' + cls }, valor), h('span', { class: 'meta' }, tag));
+    if (l.tipo !== 'sacar' && l.tipo !== 'fatura') segurar(b, () => anotarDeNovo(l));
     return b;
   }
   // segurar o dedo (meio segundo) num lançamento abre o Anotar já preenchido com ele, pra anotar igual hoje
@@ -1563,6 +1746,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   }
   let cxAbertas = (() => { try { return JSON.parse(lsGet('plin-cx-abertas') || '[]'); } catch (e) { return []; } })();
   function renderCaixinhas() {
+    renderCartaoDinheiro();
     const cxs = cfg.caixinhas.map((c) => { const rd = rendCx(c); return { ...c, rend: rd, atual: saldoCx(c) + rd, lq: liquidoCx(c, rd) }; });
     const total = cxs.reduce((a, c) => a + Math.max(0, c.atual), 0);
     $('cx-total').textContent = carregou ? brl(total) : '—';
@@ -1844,6 +2028,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const top5 = gs.filter((l) => !catSel || l.cat === catSel).sort((a, b) => b.valor - a.valor).slice(0, 5);
     $('gr-top-t').textContent = c ? `Maiores gastos em ${c.nome}` : 'Maiores gastos do período';
     $('gr-top').replaceChildren(...(top5.length ? top5.map((l) => { const cc = catById('gasto', l.cat); return h('button', { class: 'en', type: 'button', onclick: () => openLanc(l) }, h('span', { class: 't' }, l.desc || cc.nome), h('span', { class: 'v' }, brl(l.valor)), h('span', { class: 'meta' }, h('span', { class: 'tag' }, marca(cc), cc.nome), l.data.split('-').reverse().join('/'))); }) : [h('div', { class: 'empty' }, 'Nada no período.')]));
+    { const pm = {}; for (const m of mesesDoPeriodo()) for (const l of meses[m] || []) if (l.tipo === 'gasto' && l.pra) pm[l.pra] = (pm[l.pra] || 0) + l.valor;
+      const ks = Object.keys(pm).sort((a, b) => pm[b] - pm[a]); $('gr-pra-p').hidden = !ks.length; $('gr-pra').replaceChildren(...ks.map((k) => linhaE(k, pm[k]))); }
   }
 
   // pizza (rosca) dos gastos por categoria: até 6 fatias, o resto vira "Outras"
@@ -2174,6 +2360,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 
   // 8. número da versão: o que mudou
   const NOVIDADES = [
+    ['2.23.0', 'Forma de pagamento em cada gasto (Pix/débito, cartão ou dinheiro). Com o cartão cadastrado em Config, o Plin mostra em qual fatura cai cada gasto, quanto dá cada fatura e avisa no dia de pagar. Dinheiro vivo com carteira por moeda (botão Sacar nas Caixinhas). E etiqueta "pra quem" no gasto, com o total por pessoa nos Gráficos.'],
     ['2.22.0', 'Planilha em .xlsx de verdade (abas Lançamentos, Meses e Gastos por categoria, com datas e valores que dá pra somar). E o que fica dentro do pote não passa mais da borda.'],
     ['2.21.1', 'O calendário do mês agora abre com dois toques no mês lá em cima (segurar ativava a pesquisa do Google).'],
     ['2.21.0', 'Segurando e arrastando uma caixinha dá pra mudar a ordem dentro do grupo. Segurando um mês lá em cima abre o calendário de gastos dele.'],
@@ -2394,7 +2581,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const convEl = h('p', { class: 'sub', style: 'text-align:center;margin-top:-6px' });
     const curSel = h('span', { class: 'cur-sel' });
     function paintMoeda() {
-      curSel.replaceChildren(...[['brl', 'R$'], ['usd', 'US$'], ['eur', '€']].map(([k, t]) => h('button', { type: 'button', 'aria-pressed': String(moeda === k), onclick: () => { moeda = k; paintMoeda(); } }, t)));
+      curSel.replaceChildren(...[['brl', 'R$'], ['usd', 'US$'], ['eur', '€']].map(([k, t]) => h('button', { type: 'button', 'aria-pressed': String(moeda === k), onclick: () => { moeda = k; paintMoeda(); if (st.tipo === 'gasto' && st.pg === 'dinheiro') paint(); } }, t)));
       curEl.textContent = moeda === 'brl' ? 'R$' : moeda === 'usd' ? 'US$' : '€';
       cotField.hidden = moeda === 'brl';
       cotField.firstChild.textContent = moeda === 'usd' ? 'Cotação: 1 US$ em reais' : 'Cotação: 1 € em reais';
@@ -2410,7 +2597,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     function paintConv() { convEl.hidden = moeda === 'brl'; if (moeda !== 'brl') convEl.textContent = '= ' + brlReal(emReais() || 0); paintParc(); }
     cotIn.addEventListener('input', () => { paintConv(); paintTransf(); });
     const data = h('input', { type: 'date', id: 'l-data', value: st.data });
-    data.addEventListener('change', () => paintOrigem());
+    data.addEventListener('change', () => { paintOrigem(); if (st.tipo === 'gasto' && st.pg === 'cartao') paint(); });
     const kinds = h('div', { class: 'kinds' });
     const parcInfo = h('p', { class: 'sub', style: 'margin-top:-6px' });
     function paintParc() {
@@ -2420,6 +2607,25 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const cats = h('div', { class: 'chips cat-grade' });
     const extra = h('div', { class: 'stack', style: 'gap:12px' });
     let paintTransf = () => {};
+    // 2.23.0: forma de pagamento e pra quem foi o gasto
+    function pgBox() {
+      const pg = st.pg || 'pix';
+      const c = pg === 'cartao' ? (cartoes().find((x) => x.id === st.cartao) || cartoes()[0]) : null;
+      let info = '';
+      if (pg === 'cartao') info = c ? `Cai na fatura que vence ${dmCurto(venceEm(c, faturaDe({ data: data.value || todayISO() }, c)))}` + ((st.parcelas || 1) > 1 ? ' (a 1ª parcela).' : '.') : 'Cadastre o cartão em Config pra ver em qual fatura cai.';
+      else if (pg === 'dinheiro') { const mm = moeda || 'brl'; info = `Sai do dinheiro vivo (${MOEDAS[mm]}): tem ${fmtMoeda(mm, carteira()[mm] || 0)}.`; }
+      return h('div', { class: 'field' }, h('span', null, 'Pagou com'),
+        h('div', { class: 'chips pg-chips' }, [['pix', 'Pix/débito'], ['cartao', 'Cartão'], ['dinheiro', 'Dinheiro']].map(([k, t]) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(pg === k), onclick: () => { st.pg = k === 'pix' ? '' : k; if (k === 'cartao' && !cartoes().some((x) => x.id === st.cartao) && cartoes()[0]) st.cartao = cartoes()[0].id; paint(); } }, t)),
+          pg === 'cartao' && cartoes().length > 1 ? cartoes().map((x) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(c && c.id === x.id), onclick: () => { st.cartao = x.id; paint(); } }, x.nome)) : null),
+        info ? h('p', { class: 'sub' }, info) : null);
+    }
+    function praBox() {
+      const ps = pessoasUsadas().slice(0, 5);
+      const inp = h('input', { type: 'text', id: 'l-pra', autocomplete: 'off', placeholder: ps.length ? 'outra pessoa' : 'Ex.: mãe, namorado', value: st.pra && !ps.includes(st.pra) ? st.pra : '' });
+      const chips = ps.map((p) => h('button', { class: 'chip', type: 'button', 'aria-pressed': String(st.pra === p), onclick: () => { st.pra = st.pra === p ? '' : p; paint(); } }, p));
+      inp.addEventListener('input', () => { st.pra = inp.value.trim(); for (const b of chips) b.setAttribute('aria-pressed', 'false'); });
+      return h('div', { class: 'field' }, h('span', null, 'Pra quem (opcional)'), h('div', { class: 'pra-row pra-chips' }, chips, inp));
+    }
     const origemBox = h('div', { class: 'stack', style: 'gap:4px' });
     const origemInfo = h('p', { class: 'sub', id: 'l-origem-info' });
     // mostra quanto a caixinha fica depois do gasto (desconta sozinho, sem precisar mexer na aba Caixinhas)
@@ -2437,6 +2643,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       cats.replaceChildren(); extra.replaceChildren();
       if (st.tipo === 'gasto' || st.tipo === 'entrada') {
         cats.hidden = false;
+        if (st.tipo === 'gasto') extra.append(pgBox(), praBox());
         cats.append(...catsPorUso(st.tipo, uso, st.cat).map((c) => h('button', { class: 'chip cat', style: `--c:${c.cor}`, type: 'button', 'aria-pressed': String(st.cat === c.id), onclick: () => { st.cat = c.id; catManual = true; paint(); } }, marca(c), nomeCat(c.nome))));
         if (st.tipo === 'gasto') {
           if (!edit) {
@@ -2517,6 +2724,12 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
       else { if (!st.caixinha) { toast('Crie uma caixinha primeiro.'); return; } rec.caixinha = st.caixinha; }
       if (st.rec) rec.rec = st.rec;
       if (st.pj && rec.tipo === 'gasto') rec.pj = st.pj;
+      if (rec.tipo === 'gasto') {
+        if (st.pg === 'cartao' || st.pg === 'dinheiro') rec.pg = st.pg;
+        if (rec.pg === 'cartao' && cartoes().some((x) => x.id === st.cartao)) rec.cartao = st.cartao;
+        if (rec.pg === 'dinheiro' && !((st.parcelas || 1) > 1)) { if (moeda !== 'brl') rec.orig = { moeda, valor: parseCent(amt) }; else if (edit && l.orig) rec.orig = l.orig; }
+        if (st.pra) rec.pra = st.pra;
+      }
       if (l && l.parc) rec.parc = l.parc;
       sh.close();
       const n = !edit && st.tipo === 'gasto' ? (st.parcelas || 1) : 1;
@@ -2931,7 +3144,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     const nc = novo.cfg || {};
     const c = Object.assign({}, nc, cfg);
     c.categorias = { gasto: juntarListas(cfg.categorias.gasto, (nc.categorias || {}).gasto), entrada: juntarListas(cfg.categorias.entrada, (nc.categorias || {}).entrada) };
-    for (const k of ['caixinhas', 'planejados', 'recorrentes', 'lembretes', 'aportesFixos', 'cdi']) if (Array.isArray(cfg[k]) || Array.isArray(nc[k])) c[k] = juntarListas(cfg[k], nc[k]);
+    for (const k of ['caixinhas', 'planejados', 'recorrentes', 'lembretes', 'aportesFixos', 'cdi', 'cartoes']) if (Array.isArray(cfg[k]) || Array.isArray(nc[k])) c[k] = juntarListas(cfg[k], nc[k]);
     if (cfg.planosMes || nc.planosMes) c.planosMes = Object.assign({}, nc.planosMes || {}, cfg.planosMes || {});
     if (cfg.fechados || nc.fechados) c.fechados = [...new Set([...(nc.fechados || []), ...(cfg.fechados || [])])].sort().slice(-24);
     const tam = (o) => ['caixinhas', 'planejados', 'recorrentes', 'lembretes', 'aportesFixos', 'cdi'].reduce((t, k) => t + ((o[k] || []).length), (o.categorias.gasto || []).length + (o.categorias.entrada || []).length + Object.keys(o.planosMes || {}).length);
@@ -3031,14 +3244,14 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   }
   // três abas: todos os lançamentos, o resumo de cada mês e os gastos por categoria mês a mês
   function planilhaXlsx() {
-    const lanc = [['Data', 'Tipo', 'Valor', 'Categoria', 'Descrição', 'Caixinha']];
+    const lanc = [['Data', 'Tipo', 'Valor', 'Categoria', 'Descrição', 'Caixinha', 'Pagamento', 'Pra quem']];
     const todos = all().slice().sort((a, b) => a.data.localeCompare(b.data) || (a.criadoEm || 0) - (b.criadoEm || 0));
     for (const l of todos) {
       const cat = l.tipo === 'gasto' || l.tipo === 'entrada' ? catById(l.tipo, l.cat).nome : '';
       const cx = cxById(l.caixinha || l.origem);
       const cxNome = l.tipo === 'transferir' ? `${nomeCx(l.caixinha)} → ${nomeCx(l.para)}` : cx ? cx.nome : '';
       const sinal = l.tipo === 'gasto' || l.tipo === 'guardar' ? -1 : 1;
-      lanc.push([{ d: l.data }, cap(l.tipo), (l.valor || 0) / 100 * sinal, cat, l.desc || '', cxNome]);
+      lanc.push([{ d: l.data }, cap(l.tipo), (l.valor || 0) / 100 * sinal, cat, l.desc || '', cxNome, l.tipo === 'gasto' ? pgTxt(l) || 'pix/débito' : '', l.pra || '']);
     }
     const yms = Object.keys(meses).filter((ym) => (meses[ym] || []).length).sort();
     const nomeMes = (ym) => `${mShort(ym)}/${ym.slice(0, 4)}`;
@@ -3061,7 +3274,7 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
     cats.forEach(([n, m, tot], i) => { const r = i + 2; cg.push([n, ...yms.map((ym) => m[ym] ? m[ym] / 100 : ''), { f: `SUM(B${r}:${colLetra(yms.length)}${r})`, v: tot / 100 }]); });
     if (cats.length) { const u = cats.length + 1; cg.push(['Total', ...[...yms, 'T'].map((ym, j) => { const c = colLetra(j + 1); const v = ym === 'T' ? cats.reduce((a, x) => a + x[2], 0) : cats.reduce((a, x) => a + (x[1][ym] || 0), 0); return { f: `SUM(${c}2:${c}${u})`, v: v / 100 }; })]); }
     return xlsxBlob([
-      { nome: 'Lançamentos', linhas: lanc, larguras: [12, 11, 14, 18, 36, 22], estilos: [2, 0, 3], filtro: true },
+      { nome: 'Lançamentos', linhas: lanc, larguras: [12, 11, 14, 18, 36, 22, 16, 16], estilos: [2, 0, 3], filtro: true },
       { nome: 'Meses', linhas: res, larguras: [11, 14, 15, 19, 14, 14], estilos: [0, 3, 3, 3, 3, 3] },
       { nome: 'Gastos por categoria', linhas: cg, larguras: [20, ...yms.map(() => 11), 14], estilos: [0, ...yms.map(() => 3), 3], congelaCol: true },
     ]);
@@ -3082,6 +3295,8 @@ button.pdia { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   $('cx-new').addEventListener('click', () => openCx());
   $('cx-total').addEventListener('click', () => { if (carregou && cfg.caixinhas.length) openTotalCx(); });
   $('cx-transf').addEventListener('click', () => abrirTransf());
+  $('cx-sacar').addEventListener('click', () => openSacar());
+  $('ct-new').addEventListener('click', () => openCartao());
   $('cx-rend').addEventListener('click', () => openCdi());
   $('pj-new').addEventListener('click', () => openPlanejado());
   $('lb-new').addEventListener('click', () => openLembrete());
